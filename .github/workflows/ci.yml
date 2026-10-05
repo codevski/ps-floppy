@@ -54,14 +54,13 @@ jobs:
       - name: Build the payload
         run: make
 
+      # Not zipped: the link downloads ps-floppy.elf itself, ready to load.
       - name: Keep the payload
         id: artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ps-floppy-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            ps-floppy.elf
-            ps-floppy.elf.json
+          path: ps-floppy.elf
+          archive: false
           if-no-files-found: error
 
       - name: Describe the payload
@@ -75,12 +74,15 @@ jobs:
           {
             echo "### Built payload"
             echo
-            echo "[ps-floppy-$HEAD.zip]($URL): ps-floppy $version, $size KB, built from ${HEAD::7}."
-            echo "The zip holds \`ps-floppy.elf\` and its Payload Manager card."
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Download | [ps-floppy.elf]($URL) |"
+            echo "| Version | $version |"
+            echo "| Size | $size KB |"
+            echo "| Commit | ${HEAD::7} |"
+            echo "| SHA-256 | \`$sum\` |"
             echo
-            echo "SHA-256 of \`ps-floppy.elf\`: \`$sum\`"
-            echo
-            echo "Downloading needs a GitHub login. The file is kept for 90 days."
+            echo "<sub>Downloading needs a GitHub login. Kept for 90 days.</sub>"
           } > payload.md
           cat payload.md >> "$GITHUB_STEP_SUMMARY"
 
