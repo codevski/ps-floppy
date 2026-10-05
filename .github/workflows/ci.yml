@@ -37,7 +37,7 @@ jobs:
     name: Console build
     runs-on: ubuntu-24.04
     env:
-      LLVM_CONFIG: llvm-config-18
+      LLVM_CONFIG: /usr/bin/llvm-config-18
     steps:
       - uses: actions/checkout@v7
 

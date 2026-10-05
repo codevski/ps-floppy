@@ -30,7 +30,7 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
       DRAFT: ${{ inputs.draft }}
-      LLVM_CONFIG: llvm-config-18
+      LLVM_CONFIG: /usr/bin/llvm-config-18
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
