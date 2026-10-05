@@ -1,0 +1,13 @@
+.sdk/
+*.elf
+*.elf.json
+*.log
+# Desktop build data: config.json holds a real token.
+.host-data/
+build/
+# Private working notes, kept local.
+docs/
+CLAUDE.md
+# macOS, and game metadata fetched for tests.
+.DS_Store
+*-param.json

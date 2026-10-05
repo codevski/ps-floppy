@@ -1,0 +1,60 @@
+# Tests and a console build for every pull request, and for main after a
+# merge. The built payload is attached to each run, so a pull request can be
+# tried on a console before it is merged.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-18
+
+      # Ubuntu 24.04's address randomisation is too wide for the sanitizers.
+      - name: Allow the sanitizers to run
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Run the tests
+        run: make check HOST_CC=clang-18
+
+  console:
+    name: Console build
+    runs-on: ubuntu-24.04
+    env:
+      LLVM_CONFIG: llvm-config-18
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install LLVM 18
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18
+
+      - name: Fetch the PS5 payload SDK
+        run: make sdk
+
+      - name: Build the payload
+        run: make
+
+      - name: Keep the payload
+        uses: actions/upload-artifact@v7
+        with:
+          name: ps-floppy-${{ github.sha }}
+          path: |
+            ps-floppy.elf
+            ps-floppy.elf.json
+          if-no-files-found: error

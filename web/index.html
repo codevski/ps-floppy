@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Floppy tracker</title>
+<style>
+  /* No external fonts or files: the console is usually offline, and this
+     page has to work in the PS5 browser, on a phone and on a desktop. */
+  :root {
+    --page: #e9edf3;
+    --disk: #2b4570;
+    --disk-ink: #f4f7fb;
+    --label: #fbfcfd;
+    --ink: #16233a;
+    --muted: #55627a;
+    --rule: #cfd6e1;
+    --metal-a: #dfe4ec;
+    --metal-b: #b9c1ce;
+    --ok: #1c8f52;
+    --wait: #a86b12;
+    --bad: #b93a2c;
+    --off: #8a94a6;
+    --focus: #1d6fe0;
+    --button: #1f3a66;
+    --button-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0f1622;
+      --disk: #24395c;
+      --disk-ink: #eef2f8;
+      --label: #182336;
+      --ink: #e7ecf4;
+      --muted: #9ba8be;
+      --rule: #2c3a52;
+      --metal-a: #56627a;
+      --metal-b: #3a4559;
+      --ok: #3ccb80;
+      --wait: #e2a53c;
+      --bad: #f0796b;
+      --off: #6e7a90;
+      --focus: #7fb0ff;
+      --button: #8db4f5;
+      --button-ink: #0f1622;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { font-size: 112.5%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
+    line-height: 1.45;
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  /* The panel is drawn as a 3.5 inch disk: clipped corner, metal shutter
+     across the top, paper label below. The shutter carries the status. */
+  .disk {
+    width: 100%;
+    max-width: 34rem;
+    align-self: flex-start;
+    background: var(--disk);
+    color: var(--disk-ink);
+    border-radius: 0.5rem;
+    padding: 1.1rem 1.1rem 1.25rem;
+    -webkit-clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 2rem, 100% 100%, 0 100%);
+    clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 2rem, 100% 100%, 0 100%);
+  }
+  h1 {
+    margin: 0 2.5rem 0.15rem 0;
+    font-size: 1.6rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+  .sub {
+    margin: 0 2.5rem 1rem 0;
+    font-size: 0.85rem;
+    opacity: 0.8;
+  }
+
+  .shutter {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 3rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.25rem;
+    background: linear-gradient(180deg, var(--metal-a), var(--metal-b));
+    color: #16233a;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  @media (prefers-color-scheme: dark) {
+    .shutter { color: #f1f4f9; }
+  }
+  .led {
+    flex: none;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
+    background: var(--off);
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
+  }
+  .shutter[data-state="ok"] .led { background: var(--ok); }
+  .shutter[data-state="wait"] .led { background: var(--wait); }
+  .shutter[data-state="bad"] .led { background: var(--bad); }
+  @media (prefers-reduced-motion: no-preference) {
+    .shutter[data-state="wait"] .led { animation: blink 0.9s steps(2) infinite; }
+  }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  .label {
+    margin-top: 0.9rem;
+    background: var(--label);
+    color: var(--ink);
+    border-radius: 0.25rem;
+    padding: 1.1rem 1rem 1.2rem;
+  }
+  .field + .field { margin-top: 1.1rem; }
+  label {
+    display: block;
+    font-weight: 650;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+  }
+  input {
+    display: block;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.55rem 0.7rem;
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid var(--rule);
+    border-radius: 0;
+  }
+  input::placeholder { color: var(--muted); opacity: 0.75; }
+  input:focus { outline: none; border-bottom-color: var(--focus); }
+  .hint {
+    margin: 0.35rem 0 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  button {
+    display: block;
+    width: 100%;
+    min-height: 3.25rem;
+    margin-top: 1.4rem;
+    padding: 0.6rem 1rem;
+    font: inherit;
+    font-weight: 700;
+    color: var(--button-ink);
+    background: var(--button);
+    border: 0;
+    border-radius: 0.3rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  button:focus-visible,
+  input:focus-visible {
+    box-shadow: 0 0 0 3px var(--focus);
+  }
+
+  .result {
+    margin: 1rem 0 0;
+    font-size: 0.9rem;
+    min-height: 1.4em;
+  }
+  .result[data-state="ok"] { color: var(--ok); }
+  .result[data-state="bad"] { color: var(--bad); }
+
+  /* What the tracker is doing right now. Hidden until there is something
+     to say. */
+  .now {
+    margin-top: 0.9rem;
+    background: var(--label);
+    color: var(--ink);
+    border-radius: 0.25rem;
+    padding: 0.9rem 1rem;
+    font-size: 0.9rem;
+  }
+  .now[hidden] { display: none; }
+  .now p { margin: 0; }
+  .now .game { font-weight: 700; font-size: 1.05rem; }
+  .now .detail { color: var(--muted); }
+  .now ul {
+    margin: 0.5rem 0 0;
+    padding: 0.5rem 0 0;
+    list-style: none;
+    border-top: 2px solid var(--rule);
+  }
+  .now li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 1rem;
+    padding: 0.15rem 0;
+  }
+  .now li .time { flex: none; color: var(--muted); }
+  /* What sync would do with this game, under its name. */
+  .now li .sync {
+    flex-basis: 100%;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .now li .sync[data-state="needs_match"],
+  .now li .sync[data-state="retry"],
+  .now li .sync[data-state="attention"] { color: var(--bad); }
+  .now li .sync[data-state="sent"] { color: var(--ok); }
+
+  /* The one switch that lets the tracker write to Floppy. A large target
+     for a controller. */
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    margin: 0;
+    cursor: pointer;
+  }
+  .check input {
+    flex: none;
+    width: 1.6rem;
+    height: 1.6rem;
+    min-height: 0;
+    margin: 0;
+    accent-color: var(--button);
+  }
+  .now .note { margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); }
+
+  .foot {
+    margin: 0.9rem 0 0;
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+</style>
+</head>
+<body>
+<main class="disk">
+  <h1>Floppy tracker</h1>
+  <p class="sub">Sends your PS5 playtime to your Floppy library.</p>
+
+  <div class="shutter" id="shutter" data-state="off" role="status" aria-live="polite">
+    <span class="led" aria-hidden="true"></span>
+    <span id="status">Loading</span>
+  </div>
+
+  <section class="now" id="now" hidden aria-live="polite">
+    <p class="game" id="now-game"></p>
+    <p class="detail" id="now-detail"></p>
+    <ul id="waiting"></ul>
+    <p class="note" id="waiting-note"></p>
+  </section>
+
+  <form class="label" id="form" novalidate>
+    <div class="field">
+      <label for="url">Floppy address</label>
+      <input id="url" name="url" type="url" inputmode="url" autocomplete="off"
+             autocapitalize="off" spellcheck="false"
+             placeholder="http://192.168.1.10:8000">
+      <p class="hint">The address you open Floppy at on your home network. It must
+        start with http://. HTTPS addresses are not supported yet.</p>
+    </div>
+
+    <div class="field">
+      <label for="token">API token</label>
+      <input id="token" name="token" type="password" autocomplete="off"
+             autocapitalize="off" spellcheck="false" placeholder="Paste your token">
+      <p class="hint" id="token-hint">In Floppy, open Settings, then Integrations,
+        and copy the API token. It is stored on this console and never shown
+        again.</p>
+    </div>
+
+    <div class="field">
+      <label class="check" for="send">
+        <input id="send" name="send" type="checkbox">
+        Send playtime to Floppy
+      </label>
+      <p class="hint" id="send-unsaved" hidden>Not saved yet. Press Save
+        and test to apply it.</p>
+      <p class="hint" id="send-hint">Off: test mode. The tracker checks each
+        game against your library and shows what it would send, but writes
+        nothing. On: whole minutes are added to your Floppy library after each
+        game closes, and games not in your library are added as In
+        progress.</p>
+    </div>
+
+    <button type="submit" id="save">Save and test</button>
+    <p class="result" id="result" role="alert"></p>
+  </form>
+
+  <p class="foot" id="foot"></p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var form = document.getElementById("form");
+  var urlInput = document.getElementById("url");
+  var tokenInput = document.getElementById("token");
+  var tokenHint = document.getElementById("token-hint");
+  var sendInput = document.getElementById("send");
+  var sendUnsaved = document.getElementById("send-unsaved");
+  var sending = false;
+
+  /* The switch only takes effect when saved. Say so while it differs. */
+  function showUnsaved() {
+    sendUnsaved.hidden = sendInput.checked === sending;
+  }
+  sendInput.addEventListener("change", showUnsaved);
+  var saveButton = document.getElementById("save");
+  var shutter = document.getElementById("shutter");
+  var statusText = document.getElementById("status");
+  var result = document.getElementById("result");
+  var foot = document.getElementById("foot");
+
+  function setStatus(state, text) {
+    shutter.setAttribute("data-state", state);
+    statusText.textContent = text;
+  }
+
+  function setResult(state, text) {
+    result.setAttribute("data-state", state);
+    result.textContent = text;
+  }
+
+  function api(method, path, body) {
+    var options = { method: method, headers: {} };
+    if (body !== undefined) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+    return fetch(path, options).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.error || "The console returned an error.");
+        }
+        return data;
+      });
+    });
+  }
+
+  function showConfig(config) {
+    urlInput.value = config.floppy_url || "";
+    sending = config.send_to_floppy === true;
+    sendInput.checked = sending;
+    showUnsaved();
+    tokenInput.value = "";
+    if (config.token_set) {
+      tokenInput.placeholder = config.token_hint
+        ? "Saved, ends in " + config.token_hint
+        : "Saved";
+      tokenHint.textContent =
+        "A token is saved. Leave this blank to keep it, or paste a new one " +
+        "to replace it. The saved token is never shown.";
+    }
+  }
+
+  function showTest(test) {
+    if (!test.reachable) {
+      setStatus("bad", "Cannot reach Floppy");
+      setResult("bad", test.message);
+    } else if (test.token === "ok") {
+      setStatus("ok", "Connected to Floppy " + test.floppy_version);
+      setResult("ok", test.message);
+    } else if (test.token === "rejected") {
+      setStatus("bad", "Token rejected");
+      setResult("bad", test.message);
+    } else if (test.token === "missing") {
+      setStatus("wait", "Floppy found, token needed");
+      setResult("", test.message);
+    } else {
+      setStatus("wait", "Floppy found, token not confirmed");
+      setResult("", test.message);
+    }
+  }
+
+  function runTest() {
+    setStatus("wait", "Checking the connection");
+    return api("POST", "/api/test", {}).then(showTest);
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    saveButton.disabled = true;
+    setResult("", "");
+    setStatus("wait", "Saving");
+
+    var body = { floppy_url: urlInput.value, send_to_floppy: sendInput.checked };
+    if (tokenInput.value) {
+      body.token = tokenInput.value;
+    }
+
+    api("POST", "/api/config", body)
+      .then(function (config) {
+        showConfig(config);
+        return runTest();
+      })
+      .catch(function (error) {
+        setStatus("bad", "Not saved");
+        setResult("bad", error.message);
+      })
+      .then(function () {
+        saveButton.disabled = false;
+      });
+  });
+
+  var nowBox = document.getElementById("now");
+  var nowGame = document.getElementById("now-game");
+  var nowDetail = document.getElementById("now-detail");
+  var waitingList = document.getElementById("waiting");
+  var waitingNote = document.getElementById("waiting-note");
+
+  function duration(seconds) {
+    var minutes = Math.floor(seconds / 60);
+    if (minutes < 1) {
+      return "under a minute";
+    }
+    if (minutes < 60) {
+      return minutes + " min";
+    }
+    return Math.floor(minutes / 60) + " h " + (minutes % 60) + " min";
+  }
+
+  function showTracker(tracker) {
+    var playing = tracker.playing;
+    var waiting = tracker.waiting || [];
+
+    if (playing) {
+      nowGame.textContent = playing.name;
+      nowDetail.textContent = playing.focused
+        ? "Playing now. " + duration(playing.session_seconds) + " this session."
+        : "Minimized, clock paused. " + duration(playing.session_seconds) +
+          " this session.";
+    } else {
+      nowGame.textContent = "No game running";
+      nowDetail.textContent = "";
+    }
+
+    while (waitingList.firstChild) {
+      waitingList.removeChild(waitingList.firstChild);
+    }
+    waiting.forEach(function (game) {
+      var row = document.createElement("li");
+      var name = document.createElement("span");
+      var time = document.createElement("span");
+      name.textContent = game.name;
+      time.className = "time";
+      time.textContent = duration(game.seconds);
+      row.appendChild(name);
+      row.appendChild(time);
+      var open = playing && playing.title_id === game.title_id;
+      var sync = document.createElement("span");
+      sync.className = "sync";
+      sync.setAttribute("data-state", game.sync);
+      if (game.note) {
+        /* The open game is skipped by sync, so its note is from before this
+           session. */
+        sync.textContent = open
+          ? "Checked before this session, rechecked when the game closes. " +
+            game.note
+          : game.note;
+      } else if (open) {
+        sync.textContent = "Not checked yet: the game is open. It is " +
+          "checked when it closes.";
+      } else if (game.seconds < 60) {
+        sync.textContent = "Under a minute: nothing to send yet.";
+      } else {
+        sync.textContent = "Not checked yet.";
+      }
+      row.appendChild(sync);
+      waitingList.appendChild(row);
+    });
+    waitingList.hidden = waiting.length === 0;
+    waitingNote.textContent = waiting.length
+      ? (sending
+        ? "Counted on this console. Whole minutes go to Floppy after the " +
+          "game closes."
+        : "Test mode: nothing is sent to Floppy. Under each game is what " +
+          "would be sent. Turn on Send playtime to Floppy below to send it.")
+      : "";
+    nowBox.hidden = false;
+  }
+
+  function pollTracker() {
+    api("GET", "/api/tracker").then(showTracker).catch(function () {});
+  }
+  pollTracker();
+  setInterval(pollTracker, 5000);
+
+  api("GET", "/api/status")
+    .then(function (status) {
+      foot.textContent = "ps-floppy " + status.version;
+      return api("GET", "/api/config");
+    })
+    .then(function (config) {
+      showConfig(config);
+      if (config.floppy_url) {
+        return runTest();
+      }
+      setStatus("off", "Not set up yet");
+    })
+    .catch(function (error) {
+      setStatus("bad", "Cannot reach the tracker");
+      setResult("bad", error.message);
+    });
+})();
+</script>
+</body>
+</html>
