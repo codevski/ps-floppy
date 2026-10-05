@@ -1,6 +1,7 @@
 # Tests and a console build for every pull request, and for main after a
-# merge. The built payload is attached to each run, so a pull request can be
-# tried on a console before it is merged.
+# merge. The built payload is attached to each run and linked from the run's
+# summary and from a comment on the pull request, so it can be tried on a
+# console before it is merged.
 name: CI
 
 on:
@@ -36,8 +37,11 @@ jobs:
   console:
     name: Console build
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write # the comment linking the payload
     env:
-      LLVM_CONFIG: llvm-config-18
+      LLVM_CONFIG: /usr/bin/llvm-config-18
     steps:
       - uses: actions/checkout@v7
 
@@ -50,11 +54,46 @@ jobs:
       - name: Build the payload
         run: make
 
+      # Not zipped: the link downloads ps-floppy.elf itself, ready to load.
       - name: Keep the payload
+        id: artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ps-floppy-${{ github.sha }}
-          path: |
-            ps-floppy.elf
-            ps-floppy.elf.json
+          path: ps-floppy.elf
+          archive: false
           if-no-files-found: error
+
+      - name: Describe the payload
+        env:
+          URL: ${{ steps.artifact.outputs.artifact-url }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          version=$(sed -n 's/^VERSION := //p' Makefile)
+          size=$(( $(stat -c %s ps-floppy.elf) / 1024 ))
+          sum=$(sha256sum ps-floppy.elf | cut -d' ' -f1)
+          {
+            echo "### Built payload"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| Download | [ps-floppy.elf]($URL) |"
+            echo "| Version | $version |"
+            echo "| Size | $size KB |"
+            echo "| Commit | ${HEAD::7} |"
+            echo "| SHA-256 | \`$sum\` |"
+            echo
+            echo "<sub>Downloading needs a GitHub login. Kept for 90 days.</sub>"
+          } > payload.md
+          cat payload.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per pull request, edited on each push. Pull requests from
+      # forks get a read-only token, so they only have the summary.
+      - name: Link it on the pull request
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr comment "$PR" --edit-last --create-if-none --body-file payload.md

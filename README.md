@@ -66,7 +66,7 @@ Everything lives in `/data/ps-floppy/`:
 
 The [PS5 payload SDK](https://github.com/ps5-payload-dev/sdk) lives inside the project, in `.sdk/`. `make sdk` fetches the pinned version and checks its SHA-256.
 
-The SDK needs LLVM 18. On macOS: `brew install llvm@18`, found automatically. On Debian or Ubuntu: `apt install clang-18 lld-18 llvm-18`, then `export LLVM_CONFIG=llvm-config-18`.
+The SDK needs LLVM 18. On macOS: `brew install llvm@18`, found automatically. On Debian or Ubuntu: `apt install clang-18 lld-18 llvm-18`, then `export LLVM_CONFIG=/usr/bin/llvm-config-18`. The SDK needs the full path.
 
 | Command | What it does |
 | --- | --- |

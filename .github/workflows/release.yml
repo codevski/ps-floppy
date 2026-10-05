@@ -30,7 +30,7 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
       DRAFT: ${{ inputs.draft }}
-      LLVM_CONFIG: llvm-config-18
+      LLVM_CONFIG: /usr/bin/llvm-config-18
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -77,7 +77,7 @@ jobs:
         run: |
           make sdk
           make
-          sha256sum ps-floppy.elf ps-floppy.elf.json > SHA256SUMS
+          sha256sum ps-floppy.elf > SHA256SUMS
 
       - name: Create the release
         run: |
@@ -89,4 +89,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "ps-floppy $VERSION" \
             --notes-file notes.md \
-            ps-floppy.elf ps-floppy.elf.json SHA256SUMS
+            ps-floppy.elf SHA256SUMS
