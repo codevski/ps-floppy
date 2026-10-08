@@ -43,7 +43,10 @@ jobs:
     env:
       LLVM_CONFIG: /usr/bin/llvm-config-18
     steps:
+      # Full history, so the version can be worked out from the tags.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Install LLVM 18
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18
@@ -68,7 +71,7 @@ jobs:
           URL: ${{ steps.artifact.outputs.artifact-url }}
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          version=$(sed -n 's/^VERSION := //p' Makefile)
+          version=$(cat build/version)
           size=$(( $(stat -c %s ps-floppy.elf) / 1024 ))
           sum=$(sha256sum ps-floppy.elf | cut -d' ' -f1)
           {

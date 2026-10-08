@@ -1,17 +1,20 @@
 # Builds and publishes a release, started by hand from the Actions tab.
 #
-# Before running it, merge a pull request that sets VERSION in the Makefile
-# and turns the changelog's "Unreleased" section into "## <version> - <date>".
-# The release is created as a draft by default: read it on the Releases page,
-# then publish it there. The tag is created when it is published.
+# The version is not kept in any file. Leave it blank for the next patch
+# after the last release (v0.1.4 gives 0.1.5), or type one for a bigger step.
+# The release is created as a draft by default, with notes generated from the
+# pull requests merged since the last release: read and edit it on the
+# Releases page, then publish it there. The tag is created when it is
+# published.
 name: Release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version to release, as in the Makefile, for example 0.2.0
-        required: true
+        description: Version, for example 0.2.0. Blank for the next patch
+        required: false
+        default: ""
       draft:
         description: Create it as a draft, to publish from the Releases page
         type: boolean
@@ -28,42 +31,45 @@ jobs:
     name: Release
     runs-on: ubuntu-24.04
     env:
-      VERSION: ${{ inputs.version }}
+      INPUT_VERSION: ${{ inputs.version }}
       DRAFT: ${{ inputs.draft }}
       LLVM_CONFIG: /usr/bin/llvm-config-18
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Full history, so the last release tag can be found.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: Check the version
+      - name: Choose the version
         run: |
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "::error::Releases are made from main, not $GITHUB_REF."
             exit 1
           fi
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::'$VERSION' is not a version like 0.2.0."
+          last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null | sed 's/^v//')
+          last=${last:-0.0.0}
+          if [ -z "$INPUT_VERSION" ]; then
+            IFS=. read -r major minor patch <<< "$last"
+            version="$major.$minor.$((patch + 1))"
+          else
+            version=$INPUT_VERSION
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$version' is not a version like 0.2.0."
             exit 1
           fi
-          in_makefile=$(sed -n 's/^VERSION := //p' Makefile)
-          if [ "$in_makefile" != "$VERSION" ]; then
-            echo "::error::The Makefile says $in_makefile. Merge the version bump first."
+          if [ "$(printf '%s\n%s\n' "$last" "$version" | sort -V | tail -1)" != "$version" ] ||
+             [ "$version" = "$last" ]; then
+            echo "::error::$version is not after the last release, $last."
             exit 1
           fi
-          if gh release view "v$VERSION" >/dev/null 2>&1 ||
-             git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
-            echo "::error::v$VERSION already exists."
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "::error::A release v$version already exists, perhaps as a draft."
             exit 1
           fi
-          awk -v head="## $VERSION " '
-            index($0, head) == 1 { on = 1; next }
-            on && /^## / { exit }
-            on { print }
-          ' CHANGELOG.md > notes.md
-          if ! grep -q '[^[:space:]]' notes.md; then
-            echo "::error::CHANGELOG.md has no section starting '## $VERSION '."
-            exit 1
-          fi
+          echo "Releasing $version (last release: $last)"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Install LLVM 18
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18
@@ -76,7 +82,7 @@ jobs:
       - name: Build the payload
         run: |
           make sdk
-          make
+          make RELEASE_VERSION="$VERSION"
           sha256sum ps-floppy.elf > SHA256SUMS
 
       - name: Create the release
@@ -88,5 +94,5 @@ jobs:
           gh release create "v$VERSION" $draft \
             --target "$GITHUB_SHA" \
             --title "ps-floppy $VERSION" \
-            --notes-file notes.md \
+            --generate-notes \
             ps-floppy.elf SHA256SUMS

@@ -10,10 +10,14 @@
 #   make run-host                     build and run it at http://localhost:8765
 #   make check                        run the host tests
 #
-# Bump VERSION on every change. It is compiled into the payload and written to
-# the card Payload Manager shows.
-
-VERSION := 0.1.4
+# The version comes from git, so it is never edited by hand. A build of a
+# release tag is "0.1.5". A build after it is "0.1.5-3-gabc1234": three
+# commits on, at commit abc1234, with "-dirty" if files are uncommitted. With
+# no git at all it is "dev". The Release workflow sets RELEASE_VERSION. The
+# version is compiled into the payload and written to the card Payload
+# Manager shows.
+GIT_VERSION := $(shell git describe --tags --match 'v[0-9]*' --dirty 2>/dev/null | sed 's/^v//')
+VERSION     := $(or $(RELEASE_VERSION),$(GIT_VERSION),dev)
 
 NAME := ps-floppy
 ELF  := $(NAME).elf
@@ -42,7 +46,7 @@ SDK_URL     := https://github.com/ps5-payload-dev/sdk/releases/download/$(SDK_VE
 # Compiler for the desktop build and the tests.
 HOST_CC ?= cc
 
-.PHONY: all sdk host run-host push test check clean
+.PHONY: all sdk host run-host push test check clean FORCE
 all: $(ELF) $(CARD)
 
 # ---- console build --------------------------------------------------------
@@ -67,7 +71,8 @@ endif
 include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 
 # The page is baked into the ELF, so it is a build input too.
-$(ELF): $(COMMON_SRC) src/platform_ps5.c $(HEADERS) web/index.html Makefile
+$(ELF): $(COMMON_SRC) src/platform_ps5.c $(HEADERS) web/index.html Makefile \
+        build/version
 	$(CC) $(WARN) -O2 -g $(DEFS) -o $@ $(COMMON_SRC) src/platform_ps5.c -lpthread -lSceSystemService
 
 endif
@@ -115,13 +120,19 @@ sdk:
 	unzip -q -d .sdk .sdk/ps5-payload-sdk.zip
 	@echo "SDK $(SDK_VERSION) ready in .sdk/ps5-payload-sdk"
 
+# Rewritten only when the version changes, so a new commit rebuilds the
+# payload with its new version even when no source file changed.
+build/version: FORCE
+	@mkdir -p build
+	@echo '$(VERSION)' | cmp -s - $@ || echo '$(VERSION)' > $@
+
 # ---- desktop build --------------------------------------------------------
 # Same server and page, run on this machine. It reads web/index.html from disk
 # on every request, so page edits show on refresh. Settings go to ./.host-data.
 
 host: $(HOST)
 
-$(HOST): $(COMMON_SRC) src/platform_host.c $(HEADERS) Makefile
+$(HOST): $(COMMON_SRC) src/platform_host.c $(HEADERS) Makefile build/version
 	@mkdir -p build
 	$(HOST_CC) $(WARN) -O1 -g -DHOST_BUILD $(DEFS) $(HOST_DEFS) -o $@ $(COMMON_SRC) src/platform_host.c -lpthread
 
