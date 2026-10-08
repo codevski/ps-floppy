@@ -77,7 +77,9 @@ The SDK needs LLVM 18. On macOS: `brew install llvm@18`, found automatically. On
 
 Set `PS5_HOST` once in your shell instead of on every `make push`, for example `export PS5_HOST=<console-ip>` (fish: `set -Ux PS5_HOST <console-ip>`).
 
-Bump `VERSION` in the Makefile for every build that goes to a console. It shows on the Payload Manager card, in the start-up notification, in the log and at the bottom of the config page.
+Builds name themselves from git, so no version is edited by hand. A build of a release tag is `0.1.5`. A build after it is `0.1.5-3-gabc1234`: three commits on, at commit `abc1234`, with `-dirty` if files are uncommitted. The version shows on the Payload Manager card, in the start-up notification, in the log and at the bottom of the config page.
+
+Releases are made from the Actions tab with the Release workflow. Its version is optional: blank means the next patch after the last release.
 
 ## Development
 

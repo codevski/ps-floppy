@@ -1,10 +1,8 @@
 # Changelog
 
+**From 0.1.5 on, release notes are on the [Releases page](https://github.com/codevski/ps-floppy/releases).** This file keeps the history up to 0.1.4.
+
 What changed in each version, for people using the tracker. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions below 1.0 are early: expect changes. Versions before 0.1.4 were built and tested on one console and were not published.
-
-## Unreleased
-
-Nothing yet.
 
 ## 0.1.4 - 2026-10-06
 
