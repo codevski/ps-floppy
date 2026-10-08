@@ -43,9 +43,12 @@ jobs:
     env:
       LLVM_CONFIG: /usr/bin/llvm-config-18
     steps:
-      # Full history, so the version can be worked out from the tags.
+      # The pull request's own commit, not GitHub's temporary merge with main,
+      # so the payload's version names a commit that exists on the pull
+      # request. Full history, so the version can be worked out from the tags.
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Install LLVM 18
