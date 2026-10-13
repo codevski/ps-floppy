@@ -24,6 +24,8 @@
     --focus: #1d6fe0;
     --button: #1f3a66;
     --button-ink: #ffffff;
+    --tab-on: #fbfcfd;
+    --tab-on-ink: #16233a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -43,6 +45,8 @@
       --focus: #7fb0ff;
       --button: #8db4f5;
       --button-ink: #0f1622;
+      --tab-on: #8db4f5;
+      --tab-on-ink: #0f1622;
     }
   }
 
@@ -117,6 +121,31 @@
     .shutter[data-state="wait"] .led { animation: blink 0.9s steps(2) infinite; }
   }
   @keyframes blink { 50% { opacity: 0.35; } }
+
+  /* Tabs: plain buttons that switch sections, large enough to hit with a
+     controller. The selected one is filled in the brightest colour the
+     scheme has against the disk; the others are outlined. */
+  .tabs {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.9rem;
+  }
+  .tabs button {
+    flex: 1;
+    width: auto;
+    min-height: 3rem;
+    margin: 0;
+    background: transparent;
+    color: var(--disk-ink);
+    border: 2px solid var(--metal-b);
+    font-weight: 650;
+  }
+  .tabs button[aria-selected="true"] {
+    background: var(--tab-on);
+    border-color: var(--tab-on);
+    color: var(--tab-on-ink);
+  }
+  [role="tabpanel"][hidden] { display: none; }
 
   .label {
     margin-top: 0.9rem;
@@ -200,13 +229,18 @@
     list-style: none;
     border-top: 2px solid var(--rule);
   }
+  /* One card per game, separated by a rule. Room for the actions a game
+     needs, under its note. */
   .now li {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 0 1rem;
-    padding: 0.15rem 0;
+    padding: 0.55rem 0;
   }
+  .now li + li { border-top: 1px solid var(--rule); }
+  .now .setup { margin-bottom: 0.6rem; font-weight: 600; }
+  .now .setup a { color: var(--focus); }
   .now li .time { flex: none; color: var(--muted); }
   /* What sync would do with this game, under its name. */
   .now li .sync {
@@ -256,13 +290,26 @@
     <span id="status">Loading</span>
   </div>
 
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" id="tab-now" aria-controls="panel-now"
+            data-tab="now">Now</button>
+    <button type="button" role="tab" id="tab-settings"
+            aria-controls="panel-settings" data-tab="settings">Settings</button>
+  </nav>
+
+  <div id="panel-now" role="tabpanel" aria-labelledby="tab-now">
   <section class="now" id="now" hidden aria-live="polite">
+    <p class="setup" id="setup-note" hidden>Not set up yet.
+      <a href="#settings">Open Settings</a> to enter your Floppy address and
+      API token.</p>
     <p class="game" id="now-game"></p>
     <p class="detail" id="now-detail"></p>
     <ul id="waiting"></ul>
     <p class="note" id="waiting-note"></p>
   </section>
+  </div>
 
+  <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
   <form class="label" id="form" novalidate>
     <div class="field">
       <label for="url">Floppy address</label>
@@ -299,6 +346,7 @@
     <button type="submit" id="save">Save and test</button>
     <p class="result" id="result" role="alert"></p>
   </form>
+  </div>
 
   <p class="foot" id="foot"></p>
 </main>
@@ -325,6 +373,36 @@
   var statusText = document.getElementById("status");
   var result = document.getElementById("result");
   var foot = document.getElementById("foot");
+  var setupNote = document.getElementById("setup-note");
+
+  /* Tabs. Each has its own address (#now, #settings), so a tab can be
+     bookmarked and the browser's back button works. */
+  var tabs = ["now", "settings"];
+
+  function tabFromHash() {
+    var name = location.hash.replace("#", "");
+    return tabs.indexOf(name) >= 0 ? name : null;
+  }
+
+  function showTab(name) {
+    tabs.forEach(function (tab) {
+      var on = tab === name;
+      document.getElementById("tab-" + tab)
+        .setAttribute("aria-selected", on ? "true" : "false");
+      document.getElementById("panel-" + tab).hidden = !on;
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"),
+    function (button) {
+      button.addEventListener("click", function () {
+        location.hash = button.getAttribute("data-tab");
+      });
+    });
+  window.addEventListener("hashchange", function () {
+    showTab(tabFromHash() || "now");
+  });
+  showTab(tabFromHash() || "now");
 
   function setStatus(state, text) {
     shutter.setAttribute("data-state", state);
@@ -353,6 +431,7 @@
   }
 
   function showConfig(config) {
+    setupNote.hidden = Boolean(config.floppy_url && config.token_set);
     urlInput.value = config.floppy_url || "";
     sending = config.send_to_floppy === true;
     sendInput.checked = sending;
@@ -484,13 +563,14 @@
       waitingList.appendChild(row);
     });
     waitingList.hidden = waiting.length === 0;
-    waitingNote.textContent = waiting.length
-      ? (sending
+    waitingNote.textContent = !waiting.length
+      ? "Nothing waiting to be sent."
+      : sending
         ? "Counted on this console. Whole minutes go to Floppy after the " +
           "game closes."
         : "Test mode: nothing is sent to Floppy. Under each game is what " +
-          "would be sent. Turn on Send playtime to Floppy below to send it.")
-      : "";
+          "would be sent. Turn on Send playtime to Floppy in Settings to " +
+          "send it.";
     nowBox.hidden = false;
   }
 
@@ -511,6 +591,10 @@
         return runTest();
       }
       setStatus("off", "Not set up yet");
+      /* First visit: the only useful place is Settings. */
+      if (!tabFromHash()) {
+        showTab("settings");
+      }
     })
     .catch(function (error) {
       setStatus("bad", "Cannot reach the tracker");

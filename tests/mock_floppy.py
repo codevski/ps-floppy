@@ -123,8 +123,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlsplit(self.path)
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if url.path == "/api/v1/info":  # no token needed, like Floppy
+            return self.send(200, {"version": "v26.9.17-mock"})
         if not self.authorised():
             return
+        # Save and test checks the token with limit=1. Sync always asks for 10.
+        if url.path == "/api/v1/media/game" and q.get("limit") == "1":
+            return self.send(200, page(state["entries"][:1]))
         if q.get("limit") != "10":
             return self.send(400, {"detail": "expected limit=10"})
         text = q.get("search", "")
