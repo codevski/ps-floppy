@@ -263,6 +263,7 @@ handle_get_games(struct app *app, int fd, int all) {
   };
   char name[400], entry[400], note[1100];
   int waiting = 0, needs = 0, first = 1;
+  long waiting_seconds = 0;
   size_t size, used = 0;
   char *out;
 
@@ -299,9 +300,12 @@ handle_get_games(struct app *app, int fd, int all) {
 
   if(app->last_sent_at) {
     json_escape(app->last_sent, note, sizeof note);
+    json_escape(app->last_sent_title, entry, sizeof entry);
     used += (size_t)snprintf(out + used, size - used,
-                             "\"last_sent\":{\"note\":\"%s\",\"at\":%lld},",
-                             note, (long long)app->last_sent_at);
+                             "\"last_sent\":{\"note\":\"%s\",\"entry\":\"%s\","
+                             "\"minutes\":%ld,\"at\":%lld},",
+                             note, entry, app->last_sent_minutes,
+                             (long long)app->last_sent_at);
   } else {
     used += (size_t)snprintf(out + used, size - used, "\"last_sent\":null,");
   }
@@ -311,6 +315,7 @@ handle_get_games(struct app *app, int fd, int all) {
     const struct game *g = &app->store.games[i];
 
     waiting += is_waiting(g);
+    waiting_seconds += is_waiting(g) ? g->pending : 0;
     needs += needs_user(g);
     if(!all && !needs_user(g)) {
       continue;
@@ -332,8 +337,9 @@ handle_get_games(struct app *app, int fd, int all) {
     first = 0;
   }
   snprintf(out + used, size - used,
-           "],\"counts\":{\"all\":%d,\"waiting\":%d,\"needs\":%d}}",
-           app->store.count, waiting, needs);
+           "],\"counts\":{\"all\":%d,\"waiting\":%d,\"needs\":%d,"
+           "\"waiting_seconds\":%ld}}",
+           app->store.count, waiting, needs, waiting_seconds);
 
   pthread_mutex_unlock(&app->lock);
 

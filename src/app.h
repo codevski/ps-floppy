@@ -57,7 +57,10 @@ struct app {
   int                sync_wanted; /* set when a session ends */
   int                polled;      /* the tracker has looked at least once, so
                                      `now` can be trusted */
-  char               last_sent[512]; /* last confirmed write, for the page */
+  /* The last confirmed write, for the page. */
+  char               last_sent[512];       /* its note */
+  char               last_sent_title[128]; /* the Floppy entry */
+  long               last_sent_minutes;
   time_t             last_sent_at;
 };
 

@@ -70,8 +70,18 @@ set_state(struct app *app, const struct job *job, enum sync_state state,
   }
   if(state == SYNC_SENT) {
     snprintf(app->last_sent, sizeof app->last_sent, "%s", note);
-    app->last_sent_at = time(NULL);
   }
+  pthread_mutex_unlock(&app->lock);
+}
+
+/* What the page shows as the last send. Called with the confirmed minutes
+ * and the Floppy entry they went to. */
+static void
+set_last_sent(struct app *app, long minutes, const char *title) {
+  pthread_mutex_lock(&app->lock);
+  copy_tsv(app->last_sent_title, sizeof app->last_sent_title, title);
+  app->last_sent_minutes = minutes;
+  app->last_sent_at = time(NULL);
   pthread_mutex_unlock(&app->lock);
 }
 
@@ -177,6 +187,7 @@ send_and_record(struct app *app, const struct config *cfg,
              : floppy_update(cfg, igdb_id, to, why, sizeof why);
   if(ok) {
     apply_landed(app, job, from, to);
+    set_last_sent(app, to - from, title);
     if(track) {
       snprintf(note, sizeof note, "Added %s (IGDB %s) to your library with "
                "%ld min.%s", title, igdb_id, to, extra);
@@ -208,6 +219,7 @@ settle(struct app *app, const struct config *cfg, const struct job *job) {
                                job->intent_to)) {
   case SETTLE_LANDED:
     apply_landed(app, job, job->intent_from, job->intent_to);
+    set_last_sent(app, job->intent_to - job->intent_from, job->igdb_title);
     snprintf(note, sizeof note, "Sent %ld min to %s: %ld to %ld min, "
              "confirmed by reading it back.",
              job->intent_to - job->intent_from, job->igdb_title,

@@ -2,643 +2,580 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Floppy tracker</title>
 <style>
-  /* No external fonts or files: the console is usually offline, and this
-     page has to work in the PS5 browser, on a phone and on a desktop. */
+  /* A clean dashboard: a sidebar on wide screens, a bottom tab bar on
+     phones. No external fonts or files: the console serves this page itself
+     and is usually offline. Plain CSS the PS5 browser also understands. */
   :root {
-    --page: #e9edf3;
-    --disk: #2b4570;
-    --disk-ink: #f4f7fb;
-    --label: #fbfcfd;
-    --ink: #16233a;
-    --muted: #55627a;
-    --rule: #cfd6e1;
-    --metal-a: #dfe4ec;
-    --metal-b: #b9c1ce;
-    --ok: #1c8f52;
-    --wait: #a86b12;
-    --bad: #b93a2c;
-    --off: #8a94a6;
-    --focus: #1d6fe0;
-    --button: #1f3a66;
-    --button-ink: #ffffff;
-    --tab-on: #fbfcfd;
-    --tab-on-ink: #16233a;
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --fg: #13161b;
+    --muted: #5f6774;
+    --line: #e3e6eb;
+    --accent: #3d5bd9;
+    --accent-ink: #ffffff;
+    --accent-soft: #e8ecfc;
+    --ok: #157f4f;
+    --warn: #b4610b;
+    --bad: #c23b2e;
+    --bad-soft: #fcebea;
+    --bar: #c9d2f6;
+    --off: #8a929e;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --page: #0f1622;
-      --disk: #24395c;
-      --disk-ink: #eef2f8;
-      --label: #182336;
-      --ink: #e7ecf4;
-      --muted: #9ba8be;
-      --rule: #2c3a52;
-      --metal-a: #56627a;
-      --metal-b: #3a4559;
-      --ok: #3ccb80;
-      --wait: #e2a53c;
-      --bad: #f0796b;
-      --off: #6e7a90;
-      --focus: #7fb0ff;
-      --button: #8db4f5;
-      --button-ink: #0f1622;
-      --tab-on: #8db4f5;
-      --tab-on-ink: #0f1622;
+      --bg: #0f1115;
+      --surface: #171a20;
+      --fg: #e8eaef;
+      --muted: #8f97a5;
+      --line: #262a32;
+      --accent: #8198ff;
+      --accent-ink: #0f1115;
+      --accent-soft: #1e2440;
+      --ok: #45c98a;
+      --warn: #e6a246;
+      --bad: #f07a6e;
+      --bad-soft: #3a1f1d;
+      --bar: #34407a;
+      --off: #6b7280;
+      color-scheme: dark;
     }
   }
 
   * { box-sizing: border-box; }
-  html { font-size: 112.5%; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    min-height: 100vh;
-    background: var(--page);
-    color: var(--ink);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-      Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
     line-height: 1.45;
-    display: flex;
-    justify-content: center;
-    padding: 1.5rem 1rem 3rem;
   }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible,
+  input:focus-visible,
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  svg { width: 18px; height: 18px; flex: none; }
+  .num { font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
 
-  /* The panel is drawn as a 3.5 inch disk: clipped corner, metal shutter
-     across the top, paper label below. The shutter carries the status. */
-  .disk {
-    width: 100%;
-    max-width: 34rem;
-    align-self: flex-start;
-    background: var(--disk);
-    color: var(--disk-ink);
-    border-radius: 0.5rem;
-    padding: 1.1rem 1.1rem 1.25rem;
-    -webkit-clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 2rem, 100% 100%, 0 100%);
-    clip-path: polygon(0 0, calc(100% - 2rem) 0, 100% 2rem, 100% 100%, 0 100%);
-  }
-  h1 {
-    margin: 0 2.5rem 0.15rem 0;
-    font-size: 1.6rem;
-    font-weight: 750;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-  }
-  .sub {
-    margin: 0 2.5rem 1rem 0;
-    font-size: 0.85rem;
-    opacity: 0.8;
-  }
-
-  .shutter {
+  /* ---- Frame: sidebar, top bar, content, bottom tab bar ---- */
+  .app { min-height: 100%; display: flex; }
+  .side { display: none; }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .brand {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
-    min-height: 3rem;
-    padding: 0.6rem 0.85rem;
-    border-radius: 0.25rem;
-    background: linear-gradient(180deg, var(--metal-a), var(--metal-b));
-    color: #16233a;
-    font-size: 0.9rem;
+    gap: 8px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .brand svg { width: 20px; height: 20px; color: var(--accent); }
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .top h1 { margin: 0; font-size: 1.05rem; flex: 1; min-width: 0; }
+  .top .brand span { display: none; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 60%;
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.8rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  @media (prefers-color-scheme: dark) {
-    .shutter { color: #f1f4f9; }
-  }
-  .led {
+  .pill::before {
+    content: "";
     flex: none;
-    width: 0.8rem;
-    height: 0.8rem;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--off);
-    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.18);
   }
-  .shutter[data-state="ok"] .led { background: var(--ok); }
-  .shutter[data-state="wait"] .led { background: var(--wait); }
-  .shutter[data-state="bad"] .led { background: var(--bad); }
-  @media (prefers-reduced-motion: no-preference) {
-    .shutter[data-state="wait"] .led { animation: blink 0.9s steps(2) infinite; }
-  }
-  @keyframes blink { 50% { opacity: 0.35; } }
-
-  /* Tabs: plain buttons that switch sections, large enough to hit with a
-     controller. The selected one is filled in the brightest colour the
-     scheme has against the disk; the others are outlined. */
-  .tabs {
-    display: flex;
-    gap: 0.4rem;
-    margin-top: 0.9rem;
-  }
-  .tabs button {
+  .pill[data-state="ok"]::before { background: var(--ok); }
+  .pill[data-state="wait"]::before { background: var(--warn); }
+  .pill[data-state="bad"]::before { background: var(--bad); }
+  .pill[data-state="bad"] { color: var(--bad); }
+  .content {
     flex: 1;
-    width: auto;
-    min-width: 0;
-    min-height: 3rem;
-    margin: 0;
-    padding: 0.5rem 0.3rem;
-    background: transparent;
-    color: var(--disk-ink);
-    border: 2px solid var(--metal-b);
-    font-weight: 650;
-  }
-  .tabs button[aria-selected="true"] {
-    background: var(--tab-on);
-    border-color: var(--tab-on);
-    color: var(--tab-on-ink);
-  }
-  [role="tabpanel"][hidden] { display: none; }
-
-  .label {
-    margin-top: 0.9rem;
-    background: var(--label);
-    color: var(--ink);
-    border-radius: 0.25rem;
-    padding: 1.1rem 1rem 1.2rem;
-  }
-  .field + .field { margin-top: 1.1rem; }
-  label {
-    display: block;
-    font-weight: 650;
-    font-size: 0.95rem;
-    margin-bottom: 0.3rem;
-  }
-  input {
-    display: block;
+    padding: 16px 16px 96px;
+    display: grid;
+    gap: 14px;
+    align-content: start;
     width: 100%;
-    min-height: 3rem;
-    padding: 0.55rem 0.7rem;
-    font: inherit;
-    color: var(--ink);
-    background: transparent;
-    border: 0;
-    border-bottom: 2px solid var(--rule);
-    border-radius: 0;
+    max-width: 1100px;
   }
-  input::placeholder { color: var(--muted); opacity: 0.75; }
-  input:focus { outline: none; border-bottom-color: var(--focus); }
-  .hint {
-    margin: 0.35rem 0 0;
-    font-size: 0.8rem;
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .tabbar button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 0 10px;
+    border: 0;
+    background: transparent;
     color: var(--muted);
-  }
-
-  button {
-    display: block;
-    width: 100%;
-    min-height: 3.25rem;
-    margin-top: 1.4rem;
-    padding: 0.6rem 1rem;
-    font: inherit;
-    font-weight: 700;
-    color: var(--button-ink);
-    background: var(--button);
-    border: 0;
-    border-radius: 0.3rem;
-    cursor: pointer;
-  }
-  button:disabled { opacity: 0.6; cursor: default; }
-  button:focus-visible,
-  input:focus-visible {
-    box-shadow: 0 0 0 3px var(--focus);
-  }
-
-  .result {
-    margin: 1rem 0 0;
-    font-size: 0.9rem;
-    min-height: 1.4em;
-  }
-  .result[data-state="ok"] { color: var(--ok); }
-  .result[data-state="bad"] { color: var(--bad); }
-
-  /* The panels under the tabs share one card style. */
-  .card {
-    margin-top: 0.9rem;
-    background: var(--label);
-    color: var(--ink);
-    border-radius: 0.25rem;
-    padding: 0.9rem 1rem;
-    font-size: 0.9rem;
-  }
-  .card[hidden] { display: none; }
-  .card p { margin: 0; }
-  .kicker {
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 600;
+  }
+  .tabbar button[aria-current="page"] { color: var(--accent); }
+
+  /* ---- Building blocks ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .card p { margin: 0; }
+  .eyebrow {
+    margin: 0 0 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 0.25rem;
   }
-  .game { font-weight: 700; font-size: 1.05rem; }
-  .detail { color: var(--muted); }
-  .note { margin-top: 0.6rem; font-size: 0.8rem; color: var(--muted); }
-  .setup { margin-bottom: 0.6rem; font-weight: 600; }
-  .card a { color: var(--focus); }
+  .muted { color: var(--muted); }
   .bad-text { color: var(--bad); }
   .ok-text { color: var(--ok); }
-
-  /* Now: the game being played, and beside or under it what needs the
-     user. */
-  .now-grid { display: grid; gap: 1rem; }
-  .needs ul { margin: 0; padding: 0; list-style: none; }
-  .needs li { padding: 0.45rem 0; }
-  .needs li + li { border-top: 1px solid var(--rule); }
-  .needs .sync { display: block; font-size: 0.8rem; color: var(--bad); }
-
-  /* Games: a search box, filters, then one row per game. On a phone each
-     row is a small card; on a wide screen the rows line up as a table. */
-  .games-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    align-items: center;
-    margin-bottom: 0.6rem;
-  }
-  .games-bar input {
-    flex: 1 1 14rem;
-    min-height: 2.6rem;
-    border: 2px solid var(--rule);
-    border-radius: 0.3rem;
-  }
-  .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-  .filters button,
-  .row-head,
-  .more {
-    width: auto;
-    min-height: 2.4rem;
+  a { color: var(--accent); }
+  .banner {
     margin: 0;
-    padding: 0.3rem 0.8rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--fg);
+    font-size: 0.88rem;
+  }
+  .banner a { font-weight: 600; }
+
+  /* ---- Now ---- */
+  .now { display: grid; gap: 14px; }
+  .now-grid { display: grid; gap: 14px; }
+  .playing-name {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chips:empty { display: none; }
+  .chip {
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.78rem;
     font-weight: 600;
-    font-size: 0.85rem;
   }
-  .filters button {
+  .chip.plain {
     background: transparent;
-    color: var(--ink);
-    border: 2px solid var(--rule);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-weight: 500;
   }
-  .filters button[aria-pressed="true"] {
-    background: var(--button);
-    border-color: var(--button);
-    color: var(--button-ink);
+  .chip.paused { background: transparent; border: 1px solid var(--line); color: var(--warn); }
+  .goes { margin-top: 10px !important; color: var(--muted); font-size: 0.88rem; }
+  .goes:empty { display: none; }
+  .needs-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .needs-list li {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bad-soft);
   }
-  .row { border-top: 1px solid var(--rule); }
-  .row-head {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 0.1rem 1rem;
-    width: 100%;
-    padding: 0.55rem 0.2rem;
-    background: transparent;
-    color: var(--ink);
-    text-align: left;
-    font-weight: 400;
-    border-radius: 0;
-  }
-  .row-head .name { font-weight: 650; }
-  .row-head .entry,
-  .row-head .when,
-  .row-head .sent,
-  .row-head .waiting { color: var(--muted); font-size: 0.8rem; }
-  .row-head .entry[data-state="needs_match"],
-  .row-head .entry[data-state="attention"] { color: var(--bad); }
-  /* Phone: name and when on the first line, then the Floppy entry and the
-     minutes. */
-  .row-head .name { grid-row: 1; grid-column: 1; }
-  .row-head .when { grid-row: 1; grid-column: 2; text-align: right; }
-  .row-head .entry { grid-row: 2; grid-column: 1; }
-  .row-head .sent { grid-row: 2; grid-column: 2; text-align: right; }
-  .row-head .waiting { grid-row: 3; grid-column: 2; text-align: right; }
-  .row-detail { padding: 0 0.2rem 0.7rem; font-size: 0.8rem; }
-  .row-detail p + p { margin-top: 0.25rem; }
-  .columns { display: none; }
-  .more { display: block; margin: 0.6rem auto 0; }
+  .needs-list strong { font-size: 0.95rem; }
+  .needs-list .why { display: block; margin-top: 2px; color: var(--bad); font-size: 0.82rem; }
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .stat .value { font-size: 1.25rem; font-weight: 700; }
+  .stat .sub { margin-top: 2px !important; color: var(--muted); font-size: 0.82rem; }
 
-  /* Small phones: less margin around the panel, so nothing runs off the
-     side. */
-  @media (max-width: 480px) {
-    body { padding: 0.75rem 0.5rem 2rem; }
-    .disk { padding: 0.9rem 0.8rem 1rem; }
-    .card { padding: 0.8rem 0.75rem; }
-  }
-
-  @media (min-width: 760px) {
-    .disk { max-width: 62rem; }
-    #form { max-width: 34rem; }
-    .now-grid { grid-template-columns: 1fr 1fr; }
-    .row-head,
-    .columns {
-      grid-template-columns: 2fr 2fr 6rem 6rem 8rem;
-      align-items: baseline;
-    }
-    .row-head .name,
-    .row-head .entry,
-    .row-head .sent,
-    .row-head .waiting,
-    .row-head .when { grid-row: auto; grid-column: auto; }
-    .row-head .when { text-align: left; }
-    .row-head .lbl { display: none; }
-    .columns .num,
-    .row-head .sent,
-    .row-head .waiting { text-align: right; }
-    .columns {
-      display: grid;
-      gap: 0 1rem;
-      padding: 0.3rem 0.2rem;
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-    }
-  }
-
-  /* The one switch that lets the tracker write to Floppy. A large target
-     for a controller. */
-  .check {
+  /* ---- Games ---- */
+  .games { display: grid; gap: 14px; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .search {
+    flex: 1 1 200px;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    min-height: 3rem;
-    margin: 0;
-    cursor: pointer;
+    gap: 8px;
+    height: 38px;
+    padding: 0 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--muted);
   }
-  .check input {
-    flex: none;
-    width: 1.6rem;
-    height: 1.6rem;
-    min-height: 0;
-    margin: 0;
-    accent-color: var(--button);
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--fg);
+    outline: none;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .seg button {
+    padding: 7px 11px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .table { padding: 0; overflow: hidden; }
+  .row { border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .cells,
+  .head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 12px;
+    align-items: center;
+    width: 100%;
+    padding: 11px 16px;
+  }
+  .cells {
+    border: 0;
+    background: transparent;
+    text-align: left;
+  }
+  .cells:hover { background: var(--bg); }
+  .head { display: none; }
+  .c-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .c-entry { grid-column: 1; color: var(--muted); font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; }
+  .c-entry.bad { color: var(--bad); font-weight: 600; }
+  .c-when { grid-row: 1; grid-column: 2; color: var(--muted); font-size: 0.8rem; text-align: right; white-space: nowrap; }
+  .c-when.playing { color: var(--ok); font-weight: 600; }
+  .c-sent { grid-column: 2; font-size: 0.82rem; text-align: right; white-space: nowrap; }
+  .c-sent .bar { display: none; }
+  .c-wait { grid-column: 1 / -1; color: var(--warn); font-size: 0.8rem; }
+  .c-wait:empty { display: none; }
+  .lbl { color: var(--muted); }
+  .detail { padding: 0 16px 12px; font-size: 0.84rem; display: grid; gap: 4px; }
+  .detail p { margin: 0; }
+  .more {
+    justify-self: center;
+    padding: 8px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    font-weight: 600;
+  }
+  .empty { margin: 0; padding: 18px 16px; color: var(--muted); }
+
+  /* ---- Settings ---- */
+  .form { display: grid; gap: 18px; max-width: 34rem; }
+  .field label { display: block; margin-bottom: 6px; font-weight: 600; }
+  .field input[type="url"],
+  .field input[type="password"] {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .field input::placeholder { color: var(--muted); opacity: 0.8; }
+  .hint { margin: 6px 0 0 !important; color: var(--muted); font-size: 0.82rem; }
+  .field .check { display: flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; }
+  .check input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+  .primary {
+    justify-self: start;
+    min-width: 10rem;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+  }
+  .primary:disabled { opacity: 0.6; cursor: default; }
+  .result { min-height: 1.3em; font-size: 0.9rem; }
+  .result[data-state="ok"] { color: var(--ok); }
+  .result[data-state="bad"] { color: var(--bad); }
+
+  /* ---- Wide screens: sidebar instead of tab bar, Games as a table ---- */
+  @media (min-width: 760px) {
+    .side {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      width: 210px;
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 16px 12px;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+    }
+    .side .brand { padding: 4px 8px 14px; }
+    .side nav { display: grid; gap: 2px; }
+    .side nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 600;
+      text-align: left;
+    }
+    .side nav button[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+    .side .version { margin: auto 0 0; padding: 8px 10px; color: var(--muted); font-size: 0.75rem; }
+    .top { position: static; padding: 14px 24px; }
+    .top .brand { display: none; }
+    .tabbar { display: none; }
+    .content { padding: 22px 24px 32px; }
+    .now-grid.two { grid-template-columns: 1.15fr 1fr; }
+    .cells,
+    .head {
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.5fr) 200px 80px 120px;
+      gap: 0 16px;
+    }
+    .head {
+      display: grid;
+      padding-block: 8px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .head .r { text-align: right; }
+    .cells .c-name,
+    .cells .c-entry,
+    .cells .c-sent,
+    .cells .c-wait,
+    .cells .c-when { grid-row: auto; grid-column: auto; }
+    .c-when { text-align: left; }
+    /* The bar, then the amount in a fixed width so every bar starts and
+       ends at the same place. */
+    .c-sent {
+      display: grid;
+      grid-template-columns: 1fr 5.6rem;
+      align-items: center;
+      gap: 8px;
+    }
+    .c-sent .bar {
+      display: block;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--line);
+      overflow: hidden;
+    }
+    .c-sent .bar i { display: block; height: 100%; background: var(--bar); }
+    .c-sent .bar.none { visibility: hidden; }
+    .c-wait { text-align: right; }
+    .c-wait:empty { display: block; }
+    .lbl { display: none; }
   }
 
-  .foot {
-    margin: 0.9rem 0 0;
-    font-size: 0.75rem;
-    opacity: 0.75;
+  @media (prefers-reduced-motion: no-preference) {
+    button { transition: background-color 120ms ease, color 120ms ease; }
   }
 </style>
 </head>
 <body>
-<main class="disk">
-  <h1>Floppy tracker</h1>
-  <p class="sub">Sends your PS5 playtime to your Floppy library.</p>
+<div class="app">
+  <aside class="side">
+    <div class="brand" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 3h13l3 3v15H4z"/><path d="M8 3v6h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg>
+      ps-floppy
+    </div>
+    <nav aria-label="Sections">
+      <button type="button" data-tab="now">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>
+        Now</button>
+      <button type="button" data-tab="games">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+        Games</button>
+      <button type="button" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+        Settings</button>
+    </nav>
+    <p class="version num" id="version"></p>
+  </aside>
 
-  <div class="shutter" id="shutter" data-state="off" role="status" aria-live="polite">
-    <span class="led" aria-hidden="true"></span>
-    <span id="status">Loading</span>
+  <div class="main">
+    <header class="top">
+      <span class="brand" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 3h13l3 3v15H4z"/><path d="M8 3v6h8V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg>
+        <span>ps-floppy</span>
+      </span>
+      <h1 id="title">Now</h1>
+      <span class="pill" id="status" data-state="off" role="status" aria-live="polite">Loading</span>
+    </header>
+
+    <main class="content">
+      <!-- Now: what is playing, and what needs the user -->
+      <section id="panel-now" class="now" aria-labelledby="title">
+        <p class="banner" id="setup-note" hidden>Not set up yet.
+          <a href="#settings">Open Settings</a> to enter your Floppy address and
+          API token.</p>
+        <div class="now-grid" id="now-grid">
+          <section class="card" aria-live="polite">
+            <p class="eyebrow">Playing</p>
+            <p class="playing-name" id="now-game">No game running</p>
+            <div class="chips" id="now-chips"></div>
+            <p class="goes" id="now-entry"></p>
+          </section>
+          <section class="card" id="needs" hidden>
+            <p class="eyebrow" id="needs-title">Needs you</p>
+            <ul class="needs-list" id="needs-list"></ul>
+          </section>
+        </div>
+        <div class="stats">
+          <section class="card stat">
+            <p class="eyebrow">Waiting</p>
+            <p class="value num" id="waiting-value">Nothing</p>
+            <p class="sub" id="waiting-sub">Nothing counted yet.</p>
+          </section>
+          <section class="card stat">
+            <p class="eyebrow">Last sent</p>
+            <p class="value num" id="sent-value">None yet</p>
+            <p class="sub" id="sent-sub">Since the tracker started.</p>
+          </section>
+        </div>
+        <p class="banner" id="mode-note" hidden>Test mode: nothing is sent to
+          Floppy. Turn on Send playtime to Floppy in
+          <a href="#settings">Settings</a> when the games' notes look right.</p>
+      </section>
+
+      <!-- Games: every game the tracker has seen -->
+      <section id="panel-games" class="games" hidden aria-labelledby="title">
+        <div class="tools">
+          <label class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+            <input id="games-search" type="search" autocomplete="off"
+                   spellcheck="false" placeholder="Search games"
+                   aria-label="Search games">
+          </label>
+          <div class="seg" role="group" aria-label="Show">
+            <button type="button" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-filter="waiting" aria-pressed="false">Waiting</button>
+            <button type="button" data-filter="needs" aria-pressed="false">Needs you</button>
+          </div>
+        </div>
+        <section class="card table">
+          <div class="head" aria-hidden="true">
+            <span>Game</span><span>Floppy entry</span><span class="r">Sent</span>
+            <span class="r">Waiting</span><span>Last played</span>
+          </div>
+          <div id="games-list" role="list"></div>
+          <p class="empty" id="games-empty" hidden></p>
+        </section>
+        <button type="button" class="more" id="games-more" hidden>Show more</button>
+      </section>
+
+      <!-- Settings -->
+      <section id="panel-settings" hidden aria-labelledby="title">
+        <form class="card form" id="form" novalidate>
+          <div class="field">
+            <label for="url">Floppy address</label>
+            <input id="url" name="url" type="url" inputmode="url" autocomplete="off"
+                   autocapitalize="off" spellcheck="false"
+                   placeholder="http://192.168.1.10:8000">
+            <p class="hint">The address you open Floppy at on your home network.
+              It must start with http://. HTTPS addresses are not supported yet.</p>
+          </div>
+
+          <div class="field">
+            <label for="token">API token</label>
+            <input id="token" name="token" type="password" autocomplete="off"
+                   autocapitalize="off" spellcheck="false" placeholder="Paste your token">
+            <p class="hint" id="token-hint">In Floppy, open Settings, then
+              Integrations, and copy the API token. It is stored on this console
+              and never shown again.</p>
+          </div>
+
+          <div class="field">
+            <label class="check" for="send">
+              <input id="send" name="send" type="checkbox">
+              Send playtime to Floppy
+            </label>
+            <p class="hint" id="send-unsaved" hidden>Not saved yet. Press Save
+              and test to apply it.</p>
+            <p class="hint">Off: test mode. The tracker checks each game against
+              your library and shows what it would send, but writes nothing. On:
+              whole minutes are added to your Floppy library after each game
+              closes, and games not in your library are added as In progress.</p>
+          </div>
+
+          <button type="submit" class="primary" id="save">Save and test</button>
+          <p class="result" id="result" role="alert"></p>
+        </form>
+      </section>
+    </main>
   </div>
 
-  <nav class="tabs" role="tablist" aria-label="Sections">
-    <button type="button" role="tab" id="tab-now" aria-controls="panel-now"
-            data-tab="now">Now</button>
-    <button type="button" role="tab" id="tab-games" aria-controls="panel-games"
-            data-tab="games">Games</button>
-    <button type="button" role="tab" id="tab-settings"
-            aria-controls="panel-settings" data-tab="settings">Settings</button>
+  <nav class="tabbar" aria-label="Sections">
+    <button type="button" data-tab="now">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l5 3.5-5 3.5z" fill="currentColor"/></svg>
+      Now</button>
+    <button type="button" data-tab="games">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+      Games</button>
+    <button type="button" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+      Settings</button>
   </nav>
-
-  <div id="panel-now" role="tabpanel" aria-labelledby="tab-now">
-  <section class="card" id="now" hidden aria-live="polite">
-    <p class="setup" id="setup-note" hidden>Not set up yet.
-      <a href="#settings">Open Settings</a> to enter your Floppy address and
-      API token.</p>
-    <div class="now-grid">
-      <div>
-        <p class="kicker">Playing</p>
-        <p class="game" id="now-game"></p>
-        <p class="detail" id="now-detail"></p>
-        <p class="detail" id="now-entry"></p>
-      </div>
-      <div class="needs" id="needs" hidden>
-        <p class="kicker" id="needs-title">Needs you</p>
-        <ul id="needs-list"></ul>
-      </div>
-    </div>
-    <p class="note" id="waiting-summary"></p>
-    <p class="note" id="last-sent"></p>
-    <p class="note" id="mode-note"></p>
-  </section>
-  </div>
-
-  <div id="panel-games" role="tabpanel" aria-labelledby="tab-games" hidden>
-  <section class="card">
-    <div class="games-bar">
-      <input id="games-search" type="search" autocomplete="off"
-             spellcheck="false" placeholder="Search games"
-             aria-label="Search games">
-      <div class="filters" role="group" aria-label="Show">
-        <button type="button" data-filter="all" aria-pressed="true">All</button>
-        <button type="button" data-filter="waiting"
-                aria-pressed="false">Waiting</button>
-        <button type="button" data-filter="needs"
-                aria-pressed="false">Needs you</button>
-      </div>
-    </div>
-    <div class="columns" aria-hidden="true">
-      <span>Game</span><span>Floppy entry</span><span class="num">Sent</span>
-      <span class="num">Waiting</span><span>Last played</span>
-    </div>
-    <div id="games-list" role="list"></div>
-    <p class="note" id="games-empty" hidden></p>
-    <button type="button" class="more" id="games-more" hidden>Show more</button>
-  </section>
-  </div>
-
-  <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
-  <form class="label" id="form" novalidate>
-    <div class="field">
-      <label for="url">Floppy address</label>
-      <input id="url" name="url" type="url" inputmode="url" autocomplete="off"
-             autocapitalize="off" spellcheck="false"
-             placeholder="http://192.168.1.10:8000">
-      <p class="hint">The address you open Floppy at on your home network. It must
-        start with http://. HTTPS addresses are not supported yet.</p>
-    </div>
-
-    <div class="field">
-      <label for="token">API token</label>
-      <input id="token" name="token" type="password" autocomplete="off"
-             autocapitalize="off" spellcheck="false" placeholder="Paste your token">
-      <p class="hint" id="token-hint">In Floppy, open Settings, then Integrations,
-        and copy the API token. It is stored on this console and never shown
-        again.</p>
-    </div>
-
-    <div class="field">
-      <label class="check" for="send">
-        <input id="send" name="send" type="checkbox">
-        Send playtime to Floppy
-      </label>
-      <p class="hint" id="send-unsaved" hidden>Not saved yet. Press Save
-        and test to apply it.</p>
-      <p class="hint" id="send-hint">Off: test mode. The tracker checks each
-        game against your library and shows what it would send, but writes
-        nothing. On: whole minutes are added to your Floppy library after each
-        game closes, and games not in your library are added as In
-        progress.</p>
-    </div>
-
-    <button type="submit" id="save">Save and test</button>
-    <p class="result" id="result" role="alert"></p>
-  </form>
-  </div>
-
-  <p class="foot" id="foot"></p>
-</main>
+</div>
 
 <script>
 (function () {
   "use strict";
 
-  var form = document.getElementById("form");
-  var urlInput = document.getElementById("url");
-  var tokenInput = document.getElementById("token");
-  var tokenHint = document.getElementById("token-hint");
-  var sendInput = document.getElementById("send");
-  var sendUnsaved = document.getElementById("send-unsaved");
-  var sending = false;
-
-  /* The switch only takes effect when saved. Say so while it differs. */
-  function showUnsaved() {
-    sendUnsaved.hidden = sendInput.checked === sending;
-  }
-  sendInput.addEventListener("change", showUnsaved);
-  var saveButton = document.getElementById("save");
-  var shutter = document.getElementById("shutter");
-  var statusText = document.getElementById("status");
-  var result = document.getElementById("result");
-  var foot = document.getElementById("foot");
-  var setupNote = document.getElementById("setup-note");
-
-  /* Tabs. Each has its own address (#now, #games, #settings), so a tab can
-     be bookmarked and the browser's back button works. */
-  var tabs = ["now", "games", "settings"];
-  var currentTab = "now";
-
-  function tabFromHash() {
-    var name = location.hash.replace("#", "");
-    return tabs.indexOf(name) >= 0 ? name : null;
-  }
-
-  function showTab(name) {
-    currentTab = name;
-    if (name === "games") {
-      loadGames();
-    }
-    tabs.forEach(function (tab) {
-      var on = tab === name;
-      document.getElementById("tab-" + tab)
-        .setAttribute("aria-selected", on ? "true" : "false");
-      document.getElementById("panel-" + tab).hidden = !on;
-    });
-  }
-
-  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"),
-    function (button) {
-      button.addEventListener("click", function () {
-        location.hash = button.getAttribute("data-tab");
-      });
-    });
-  window.addEventListener("hashchange", function () {
-    showTab(tabFromHash() || "now");
-  });
-  showTab(tabFromHash() || "now");
-
-  function setStatus(state, text) {
-    shutter.setAttribute("data-state", state);
-    statusText.textContent = text;
-  }
-
-  function setResult(state, text) {
-    result.setAttribute("data-state", state);
-    result.textContent = text;
-  }
-
-  function api(method, path, body) {
-    var options = { method: method, headers: {} };
-    if (body !== undefined) {
-      options.headers["Content-Type"] = "application/json";
-      options.body = JSON.stringify(body);
-    }
-    return fetch(path, options).then(function (response) {
-      return response.json().then(function (data) {
-        if (!response.ok) {
-          throw new Error(data.error || "The console returned an error.");
-        }
-        return data;
-      });
-    });
-  }
-
-  function showConfig(config) {
-    configured = Boolean(config.floppy_url && config.token_set);
-    setupNote.hidden = configured;
-    urlInput.value = config.floppy_url || "";
-    sending = config.send_to_floppy === true;
-    sendInput.checked = sending;
-    showUnsaved();
-    tokenInput.value = "";
-    if (config.token_set) {
-      tokenInput.placeholder = config.token_hint
-        ? "Saved, ends in " + config.token_hint
-        : "Saved";
-      tokenHint.textContent =
-        "A token is saved. Leave this blank to keep it, or paste a new one " +
-        "to replace it. The saved token is never shown.";
-    }
-  }
-
-  function showTest(test) {
-    if (!test.reachable) {
-      setStatus("bad", "Cannot reach Floppy");
-      setResult("bad", test.message);
-    } else if (test.token === "ok") {
-      setStatus("ok", "Connected to Floppy " + test.floppy_version);
-      setResult("ok", test.message);
-    } else if (test.token === "rejected") {
-      setStatus("bad", "Token rejected");
-      setResult("bad", test.message);
-    } else if (test.token === "missing") {
-      setStatus("wait", "Floppy found, token needed");
-      setResult("", test.message);
-    } else {
-      setStatus("wait", "Floppy found, token not confirmed");
-      setResult("", test.message);
-    }
-  }
-
-  function runTest() {
-    setStatus("wait", "Checking the connection");
-    return api("POST", "/api/test", {}).then(showTest);
-  }
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-    saveButton.disabled = true;
-    setResult("", "");
-    setStatus("wait", "Saving");
-
-    var body = { floppy_url: urlInput.value, send_to_floppy: sendInput.checked };
-    if (tokenInput.value) {
-      body.token = tokenInput.value;
-    }
-
-    api("POST", "/api/config", body)
-      .then(function (config) {
-        showConfig(config);
-        return runTest();
-      })
-      .catch(function (error) {
-        setStatus("bad", "Not saved");
-        setResult("bad", error.message);
-      })
-      .then(function () {
-        saveButton.disabled = false;
-      });
-  });
-
-  /* ---- Formatting and building -------------------------------------- */
+  /* ---- Formatting and building ------------------------------------------ */
 
   var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
                 "Sep", "Oct", "Nov", "Dec"];
@@ -720,6 +657,10 @@
     }
   }
 
+  function isNeeds(game) {
+    return game.sync === "needs_match" || game.sync === "attention";
+  }
+
   function needsText(game) {
     if (game.note) {
       return game.note;
@@ -727,36 +668,108 @@
     return game.sync === "attention" ? "Needs attention." : "Needs a match.";
   }
 
-  /* ---- Now: what is playing, and what needs the user ------------------ */
+  function api(method, path, body) {
+    var options = { method: method, headers: {} };
+    if (body !== undefined) {
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+    return fetch(path, options).then(function (response) {
+      return response.json().then(function (data) {
+        if (!response.ok) {
+          throw new Error(data.error || "The console returned an error.");
+        }
+        return data;
+      });
+    });
+  }
 
-  var nowBox = document.getElementById("now");
+  /* ---- Tabs ------------------------------------------------------------- */
+
+  /* Each tab has its own address (#now, #games, #settings), so a tab can be
+     bookmarked and the browser's back button works. */
+  var tabs = { now: "Now", games: "Games", settings: "Settings" };
+  var currentTab = "now";
+  var title = document.getElementById("title");
+
+  function tabFromHash() {
+    var name = location.hash.replace("#", "");
+    return tabs.hasOwnProperty(name) ? name : null;
+  }
+
+  function showTab(name) {
+    currentTab = name;
+    title.textContent = tabs[name];
+    Object.keys(tabs).forEach(function (tab) {
+      document.getElementById("panel-" + tab).hidden = tab !== name;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"),
+      function (button) {
+        if (button.getAttribute("data-tab") === name) {
+          button.setAttribute("aria-current", "page");
+        } else {
+          button.removeAttribute("aria-current");
+        }
+      });
+    if (name === "games") {
+      loadGames();
+    }
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"),
+    function (button) {
+      button.addEventListener("click", function () {
+        location.hash = button.getAttribute("data-tab");
+      });
+    });
+  window.addEventListener("hashchange", function () {
+    showTab(tabFromHash() || "now");
+  });
+
+  /* ---- Connection status ------------------------------------------------ */
+
+  var statusPill = document.getElementById("status");
+
+  function setStatus(state, text, detail) {
+    statusPill.setAttribute("data-state", state);
+    statusPill.textContent = text;
+    statusPill.title = detail || text;
+  }
+
+  /* ---- Now: what is playing, and what needs the user -------------------- */
+
+  var nowGrid = document.getElementById("now-grid");
   var nowGame = document.getElementById("now-game");
-  var nowDetail = document.getElementById("now-detail");
+  var nowChips = document.getElementById("now-chips");
   var nowEntry = document.getElementById("now-entry");
   var needsBox = document.getElementById("needs");
   var needsTitle = document.getElementById("needs-title");
   var needsList = document.getElementById("needs-list");
-  var waitingSummary = document.getElementById("waiting-summary");
-  var lastSent = document.getElementById("last-sent");
+  var waitingValue = document.getElementById("waiting-value");
+  var waitingSub = document.getElementById("waiting-sub");
+  var sentValue = document.getElementById("sent-value");
+  var sentSub = document.getElementById("sent-sub");
   var modeNote = document.getElementById("mode-note");
+  var setupNote = document.getElementById("setup-note");
   var configured = false;
+  var sending = false;
 
   function showNow(data) {
     var playing = data.playing;
     var counts = data.counts;
 
+    clear(nowChips);
     if (playing) {
       nowGame.textContent = playing.name;
-      nowDetail.textContent = (playing.focused
-        ? "On screen. "
-        : "Minimized, clock paused. ") +
-        capital(duration(playing.session_seconds)) + " this session.";
+      nowChips.appendChild(el("span", playing.focused ? "chip" : "chip paused",
+        playing.focused ? "On screen" : "Minimized, clock paused"));
+      nowChips.appendChild(el("span", "chip plain num",
+        capital(duration(playing.session_seconds)) + " this session"));
       nowEntry.textContent = playing.entry
         ? "Goes to " + playing.entry + " in Floppy."
         : "Not matched to a Floppy entry yet. That happens when it closes.";
     } else {
       nowGame.textContent = "No game running";
-      nowDetail.textContent = "";
       nowEntry.textContent = "";
     }
 
@@ -765,41 +778,40 @@
       var item = el("li");
       item.appendChild(el("strong", "", game.name));
       if (game.waiting_seconds) {
-        item.appendChild(el("span", "detail",
+        item.appendChild(el("span", "muted num",
           " · " + duration(game.waiting_seconds) + " waiting"));
       }
-      item.appendChild(el("span", "sync", needsText(game)));
+      item.appendChild(el("span", "why", needsText(game)));
       needsList.appendChild(item);
     });
     needsBox.hidden = counts.needs === 0;
-    needsTitle.textContent = "Needs you (" + counts.needs + ")";
+    needsTitle.textContent = "Needs you · " + counts.needs;
+    nowGrid.className = counts.needs ? "now-grid two" : "now-grid";
 
-    clear(waitingSummary);
     if (counts.waiting) {
-      var link = el("a", "", "See Games");
-      link.href = "#games";
-      link.addEventListener("click", function () {
-        setFilter("waiting");
-      });
-      waitingSummary.appendChild(document.createTextNode(counts.waiting +
-        (counts.waiting === 1 ? " game has" : " games have") +
-        " time waiting to be sent. "));
-      waitingSummary.appendChild(link);
-    } else if (!playing && !counts.needs && configured) {
-      waitingSummary.textContent = "Everything is sent.";
+      waitingValue.textContent = capital(duration(counts.waiting_seconds));
+      waitingSub.textContent = counts.waiting +
+        (counts.waiting === 1 ? " game" : " games") +
+        ", sent when " + (counts.waiting === 1 ? "it closes" : "they close");
+    } else {
+      waitingValue.textContent = "Nothing";
+      waitingSub.textContent = configured ? "Everything is sent."
+                                          : "Nothing counted yet.";
     }
 
-    lastSent.textContent = data.last_sent
-      ? "Last sent " + ago(data.last_sent.at) + ": " + data.last_sent.note
-      : "";
-    modeNote.textContent = configured && !sending
-      ? "Test mode: nothing is sent to Floppy. Turn on Send playtime to " +
-        "Floppy in Settings when the games' notes look right."
-      : "";
-    nowBox.hidden = false;
+    if (data.last_sent) {
+      sentValue.textContent = data.last_sent.minutes + " min";
+      sentSub.textContent = "to " + data.last_sent.entry + ", " +
+        ago(data.last_sent.at);
+    } else {
+      sentValue.textContent = "None yet";
+      sentSub.textContent = "Since the tracker started.";
+    }
+
+    modeNote.hidden = !configured || sending;
   }
 
-  /* ---- Games: every game the tracker has seen ------------------------- */
+  /* ---- Games: every game the tracker has seen --------------------------- */
 
   var gamesSearch = document.getElementById("games-search");
   var gamesList = document.getElementById("games-list");
@@ -822,54 +834,61 @@
     renderGames();
   }
 
-  function isNeeds(game) {
-    return game.sync === "needs_match" || game.sync === "attention";
-  }
-
-  function gameRow(game, playing) {
+  function gameRow(game, playing, maxSent) {
     var id = game.title_id;
     var row = el("div", "row");
-    var head = el("button", "row-head");
-    var detail = el("div", "row-detail");
-    var entry = el("span", "entry", game.entry ||
+    var cells = el("button", "cells");
+    var detail = el("div", "detail");
+    var entry = el("span", "c-entry", game.entry ||
       (game.sync === "needs_match" ? "Needs a match"
        : game.sync === "attention" ? "Needs attention" : "Not matched yet"));
-    var sent = el("span", "sent", game.sent_minutes
+    var sent = el("span", "c-sent num");
+    var bar = el("span", game.sent_minutes ? "bar" : "bar none");
+    var fill = el("i");
+    var amount = el("span", "", game.sent_minutes
       ? duration(game.sent_minutes * 60) : "");
-    var waiting = el("span", "waiting", game.waiting_seconds
-      ? duration(game.waiting_seconds) : "");
+    var waiting = el("span", "c-wait num");
 
     row.setAttribute("role", "listitem");
-    head.type = "button";
-    head.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
-    entry.setAttribute("data-state", game.sync);
-    if (game.sent_minutes) {
-      sent.appendChild(el("span", "lbl", " sent"));
+    cells.type = "button";
+    cells.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
+    if (isNeeds(game) && !game.entry) {
+      entry.className = "c-entry bad";
     }
+    fill.style.width = game.sent_minutes
+      ? Math.max(4, Math.round(game.sent_minutes / maxSent * 100)) + "%" : "0";
+    bar.appendChild(fill);
+    if (game.sent_minutes) {
+      amount.appendChild(el("span", "lbl", " sent"));
+    }
+    sent.appendChild(bar);
+    sent.appendChild(amount);
     if (game.waiting_seconds) {
+      waiting.textContent = duration(game.waiting_seconds);
       waiting.appendChild(el("span", "lbl", " waiting"));
     }
-    head.appendChild(el("span", "name", game.name));
-    head.appendChild(entry);
-    head.appendChild(sent);
-    head.appendChild(waiting);
-    head.appendChild(el("span", "when",
+
+    cells.appendChild(el("span", "c-name", game.name));
+    cells.appendChild(entry);
+    cells.appendChild(sent);
+    cells.appendChild(waiting);
+    cells.appendChild(el("span", playing ? "c-when playing" : "c-when",
       playing ? "playing now" : when(game.last_played)));
 
     if (game.note) {
       detail.appendChild(el("p", isNeeds(game) ? "bad-text"
         : game.sync === "sent" ? "ok-text" : "", game.note));
     }
-    detail.appendChild(el("p", "detail", "Title ID " + id +
+    detail.appendChild(el("p", "muted", "Title ID " + id +
       (game.last_played ? ". Last played " + when(game.last_played) + "." : ".")));
     detail.hidden = !expanded[id];
 
-    head.addEventListener("click", function () {
+    cells.addEventListener("click", function () {
       expanded[id] = !expanded[id];
       detail.hidden = !expanded[id];
-      head.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
+      cells.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
     });
-    row.appendChild(head);
+    row.appendChild(cells);
     row.appendChild(detail);
     return row;
   }
@@ -883,9 +902,13 @@
     var query = gamesSearch.value.trim().toLowerCase();
     var labels = { all: "All " + counts.all, waiting: "Waiting " + counts.waiting,
                    needs: "Needs you " + counts.needs };
+    var maxSent = 1;
 
     Array.prototype.forEach.call(filterButtons, function (button) {
       button.textContent = labels[button.getAttribute("data-filter")];
+    });
+    gamesData.games.forEach(function (game) {
+      maxSent = Math.max(maxSent, game.sent_minutes);
     });
 
     var list = gamesData.games.filter(function (game) {
@@ -911,7 +934,7 @@
 
     clear(gamesList);
     list.slice(0, gamesShown).forEach(function (game) {
-      gamesList.appendChild(gameRow(game, game.title_id === playingId));
+      gamesList.appendChild(gameRow(game, game.title_id === playingId, maxSent));
     });
     gamesMore.hidden = list.length <= gamesShown;
     gamesEmpty.hidden = list.length > 0;
@@ -943,20 +966,139 @@
     renderGames();
   });
 
-  /* Now is polled all the time, so its card stays current whichever tab is
-     open. The full game list only while Games is open. */
+  /* ---- Settings --------------------------------------------------------- */
+
+  var form = document.getElementById("form");
+  var urlInput = document.getElementById("url");
+  var tokenInput = document.getElementById("token");
+  var tokenHint = document.getElementById("token-hint");
+  var sendInput = document.getElementById("send");
+  var sendUnsaved = document.getElementById("send-unsaved");
+  var saveButton = document.getElementById("save");
+  var result = document.getElementById("result");
+
+  /* The switch only takes effect when saved. Say so while it differs. */
+  function showUnsaved() {
+    sendUnsaved.hidden = sendInput.checked === sending;
+  }
+  sendInput.addEventListener("change", showUnsaved);
+
+  function setResult(state, text) {
+    result.setAttribute("data-state", state);
+    result.textContent = text;
+  }
+
+  function showConfig(config) {
+    configured = Boolean(config.floppy_url && config.token_set);
+    setupNote.hidden = configured;
+    urlInput.value = config.floppy_url || "";
+    sending = config.send_to_floppy === true;
+    sendInput.checked = sending;
+    showUnsaved();
+    tokenInput.value = "";
+    if (config.token_set) {
+      tokenInput.placeholder = config.token_hint
+        ? "Saved, ends in " + config.token_hint
+        : "Saved";
+      tokenHint.textContent =
+        "A token is saved. Leave this blank to keep it, or paste a new one " +
+        "to replace it. The saved token is never shown.";
+    }
+  }
+
+  function showTest(test) {
+    if (!test.reachable) {
+      setStatus("bad", "Cannot reach Floppy", test.message);
+      setResult("bad", test.message);
+    } else if (test.token === "ok") {
+      setStatus("ok", "Connected", "Connected to Floppy " + test.floppy_version);
+      setResult("ok", test.message + " Floppy " + test.floppy_version + ".");
+    } else if (test.token === "rejected") {
+      setStatus("bad", "Token rejected", test.message);
+      setResult("bad", test.message);
+    } else if (test.token === "missing") {
+      setStatus("wait", "Token needed", test.message);
+      setResult("", test.message);
+    } else {
+      setStatus("wait", "Token not confirmed", test.message);
+      setResult("", test.message);
+    }
+  }
+
+  function runTest() {
+    setStatus("wait", "Checking");
+    return api("POST", "/api/test", {}).then(showTest);
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    saveButton.disabled = true;
+    setResult("", "");
+    setStatus("wait", "Saving");
+
+    var body = { floppy_url: urlInput.value, send_to_floppy: sendInput.checked };
+    if (tokenInput.value) {
+      body.token = tokenInput.value;
+    }
+
+    api("POST", "/api/config", body)
+      .then(function (config) {
+        showConfig(config);
+        return runTest();
+      })
+      .catch(function (error) {
+        setStatus("bad", "Not saved", error.message);
+        setResult("bad", error.message);
+      })
+      .then(function () {
+        saveButton.disabled = false;
+      });
+  });
+
+  /* ---- Polling ---------------------------------------------------------- */
+
+  /* Now is polled every 5 seconds whichever tab is open, the full game list
+     only while Games is open. Nothing is asked while the page is hidden (a
+     background tab, a locked phone), so an idle page costs the console
+     nothing. */
+  var timer = null;
+
   function poll() {
     api("GET", "/api/tracker").then(showNow).catch(function () {});
     if (currentTab === "games") {
       loadGames();
     }
   }
-  poll();
-  setInterval(poll, 5000);
+
+  function startPolling() {
+    if (!timer) {
+      poll();
+      timer = setInterval(poll, 5000);
+    }
+  }
+
+  function stopPolling() {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      stopPolling();
+    } else {
+      startPolling();
+    }
+  });
+
+  /* ---- Start ------------------------------------------------------------ */
+
+  showTab(tabFromHash() || "now");
+  startPolling();
 
   api("GET", "/api/status")
     .then(function (status) {
-      foot.textContent = "ps-floppy " + status.version;
+      document.getElementById("version").textContent =
+        "ps-floppy " + status.version;
       return api("GET", "/api/config");
     })
     .then(function (config) {
@@ -971,7 +1113,7 @@
       }
     })
     .catch(function (error) {
-      setStatus("bad", "Cannot reach the tracker");
+      setStatus("bad", "Cannot reach the tracker", error.message);
       setResult("bad", error.message);
     });
 })();
