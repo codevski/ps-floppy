@@ -57,6 +57,8 @@ struct app {
   int                sync_wanted; /* set when a session ends */
   int                polled;      /* the tracker has looked at least once, so
                                      `now` can be trusted */
+  char               last_sent[512]; /* last confirmed write, for the page */
+  time_t             last_sent_at;
 };
 
 /* Append a timestamped line to the tracker's log file. */

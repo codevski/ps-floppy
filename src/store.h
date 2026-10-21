@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <time.h>
 
 #define STORE_MAX_GAMES 256
 
@@ -36,6 +37,7 @@ struct game {
   long intent_to;       /* the total the write sets */
   long last_total;      /* last total the tracker wrote, 0 if none yet. A
                            write always sets at least 1 minute */
+  time_t last_played;   /* when a counted session last ended, 0 if never */
 
   /* Not saved to disk. */
   enum sync_state sync;

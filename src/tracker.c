@@ -40,6 +40,10 @@ end_session(struct app *app) {
   } else {
     app_log(app, "closed %s \"%s\": session %lds, %lds waiting to send",
             now->title_id, now->name, now->session, g ? g->pending : 0);
+    if(g) {
+      g->last_played = time(NULL);
+      app->store.dirty = 1;
+    }
     app->sync_wanted = 1;
   }
   memset(now, 0, sizeof *now);

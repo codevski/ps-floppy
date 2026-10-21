@@ -133,8 +133,10 @@
   .tabs button {
     flex: 1;
     width: auto;
+    min-width: 0;
     min-height: 3rem;
     margin: 0;
+    padding: 0.5rem 0.3rem;
     background: transparent;
     color: var(--disk-ink);
     border: 2px solid var(--metal-b);
@@ -209,9 +211,8 @@
   .result[data-state="ok"] { color: var(--ok); }
   .result[data-state="bad"] { color: var(--bad); }
 
-  /* What the tracker is doing right now. Hidden until there is something
-     to say. */
-  .now {
+  /* The panels under the tabs share one card style. */
+  .card {
     margin-top: 0.9rem;
     background: var(--label);
     color: var(--ink);
@@ -219,39 +220,138 @@
     padding: 0.9rem 1rem;
     font-size: 0.9rem;
   }
-  .now[hidden] { display: none; }
-  .now p { margin: 0; }
-  .now .game { font-weight: 700; font-size: 1.05rem; }
-  .now .detail { color: var(--muted); }
-  .now ul {
-    margin: 0.5rem 0 0;
-    padding: 0.5rem 0 0;
-    list-style: none;
-    border-top: 2px solid var(--rule);
+  .card[hidden] { display: none; }
+  .card p { margin: 0; }
+  .kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
   }
-  /* One card per game, separated by a rule. Room for the actions a game
-     needs, under its note. */
-  .now li {
+  .game { font-weight: 700; font-size: 1.05rem; }
+  .detail { color: var(--muted); }
+  .note { margin-top: 0.6rem; font-size: 0.8rem; color: var(--muted); }
+  .setup { margin-bottom: 0.6rem; font-weight: 600; }
+  .card a { color: var(--focus); }
+  .bad-text { color: var(--bad); }
+  .ok-text { color: var(--ok); }
+
+  /* Now: the game being played, and beside or under it what needs the
+     user. */
+  .now-grid { display: grid; gap: 1rem; }
+  .needs ul { margin: 0; padding: 0; list-style: none; }
+  .needs li { padding: 0.45rem 0; }
+  .needs li + li { border-top: 1px solid var(--rule); }
+  .needs .sync { display: block; font-size: 0.8rem; color: var(--bad); }
+
+  /* Games: a search box, filters, then one row per game. On a phone each
+     row is a small card; on a wide screen the rows line up as a table. */
+  .games-bar {
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0 1rem;
-    padding: 0.55rem 0;
+    gap: 0.6rem;
+    align-items: center;
+    margin-bottom: 0.6rem;
   }
-  .now li + li { border-top: 1px solid var(--rule); }
-  .now .setup { margin-bottom: 0.6rem; font-weight: 600; }
-  .now .setup a { color: var(--focus); }
-  .now li .time { flex: none; color: var(--muted); }
-  /* What sync would do with this game, under its name. */
-  .now li .sync {
-    flex-basis: 100%;
-    font-size: 0.8rem;
-    color: var(--muted);
+  .games-bar input {
+    flex: 1 1 14rem;
+    min-height: 2.6rem;
+    border: 2px solid var(--rule);
+    border-radius: 0.3rem;
   }
-  .now li .sync[data-state="needs_match"],
-  .now li .sync[data-state="retry"],
-  .now li .sync[data-state="attention"] { color: var(--bad); }
-  .now li .sync[data-state="sent"] { color: var(--ok); }
+  .filters { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .filters button,
+  .row-head,
+  .more {
+    width: auto;
+    min-height: 2.4rem;
+    margin: 0;
+    padding: 0.3rem 0.8rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  .filters button {
+    background: transparent;
+    color: var(--ink);
+    border: 2px solid var(--rule);
+  }
+  .filters button[aria-pressed="true"] {
+    background: var(--button);
+    border-color: var(--button);
+    color: var(--button-ink);
+  }
+  .row { border-top: 1px solid var(--rule); }
+  .row-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.1rem 1rem;
+    width: 100%;
+    padding: 0.55rem 0.2rem;
+    background: transparent;
+    color: var(--ink);
+    text-align: left;
+    font-weight: 400;
+    border-radius: 0;
+  }
+  .row-head .name { font-weight: 650; }
+  .row-head .entry,
+  .row-head .when,
+  .row-head .sent,
+  .row-head .waiting { color: var(--muted); font-size: 0.8rem; }
+  .row-head .entry[data-state="needs_match"],
+  .row-head .entry[data-state="attention"] { color: var(--bad); }
+  /* Phone: name and when on the first line, then the Floppy entry and the
+     minutes. */
+  .row-head .name { grid-row: 1; grid-column: 1; }
+  .row-head .when { grid-row: 1; grid-column: 2; text-align: right; }
+  .row-head .entry { grid-row: 2; grid-column: 1; }
+  .row-head .sent { grid-row: 2; grid-column: 2; text-align: right; }
+  .row-head .waiting { grid-row: 3; grid-column: 2; text-align: right; }
+  .row-detail { padding: 0 0.2rem 0.7rem; font-size: 0.8rem; }
+  .row-detail p + p { margin-top: 0.25rem; }
+  .columns { display: none; }
+  .more { display: block; margin: 0.6rem auto 0; }
+
+  /* Small phones: less margin around the panel, so nothing runs off the
+     side. */
+  @media (max-width: 480px) {
+    body { padding: 0.75rem 0.5rem 2rem; }
+    .disk { padding: 0.9rem 0.8rem 1rem; }
+    .card { padding: 0.8rem 0.75rem; }
+  }
+
+  @media (min-width: 760px) {
+    .disk { max-width: 62rem; }
+    #form { max-width: 34rem; }
+    .now-grid { grid-template-columns: 1fr 1fr; }
+    .row-head,
+    .columns {
+      grid-template-columns: 2fr 2fr 6rem 6rem 8rem;
+      align-items: baseline;
+    }
+    .row-head .name,
+    .row-head .entry,
+    .row-head .sent,
+    .row-head .waiting,
+    .row-head .when { grid-row: auto; grid-column: auto; }
+    .row-head .when { text-align: left; }
+    .row-head .lbl { display: none; }
+    .columns .num,
+    .row-head .sent,
+    .row-head .waiting { text-align: right; }
+    .columns {
+      display: grid;
+      gap: 0 1rem;
+      padding: 0.3rem 0.2rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+    }
+  }
 
   /* The one switch that lets the tracker write to Floppy. A large target
      for a controller. */
@@ -271,7 +371,6 @@
     margin: 0;
     accent-color: var(--button);
   }
-  .now .note { margin-top: 0.5rem; font-size: 0.8rem; color: var(--muted); }
 
   .foot {
     margin: 0.9rem 0 0;
@@ -293,19 +392,56 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" id="tab-now" aria-controls="panel-now"
             data-tab="now">Now</button>
+    <button type="button" role="tab" id="tab-games" aria-controls="panel-games"
+            data-tab="games">Games</button>
     <button type="button" role="tab" id="tab-settings"
             aria-controls="panel-settings" data-tab="settings">Settings</button>
   </nav>
 
   <div id="panel-now" role="tabpanel" aria-labelledby="tab-now">
-  <section class="now" id="now" hidden aria-live="polite">
+  <section class="card" id="now" hidden aria-live="polite">
     <p class="setup" id="setup-note" hidden>Not set up yet.
       <a href="#settings">Open Settings</a> to enter your Floppy address and
       API token.</p>
-    <p class="game" id="now-game"></p>
-    <p class="detail" id="now-detail"></p>
-    <ul id="waiting"></ul>
-    <p class="note" id="waiting-note"></p>
+    <div class="now-grid">
+      <div>
+        <p class="kicker">Playing</p>
+        <p class="game" id="now-game"></p>
+        <p class="detail" id="now-detail"></p>
+        <p class="detail" id="now-entry"></p>
+      </div>
+      <div class="needs" id="needs" hidden>
+        <p class="kicker" id="needs-title">Needs you</p>
+        <ul id="needs-list"></ul>
+      </div>
+    </div>
+    <p class="note" id="waiting-summary"></p>
+    <p class="note" id="last-sent"></p>
+    <p class="note" id="mode-note"></p>
+  </section>
+  </div>
+
+  <div id="panel-games" role="tabpanel" aria-labelledby="tab-games" hidden>
+  <section class="card">
+    <div class="games-bar">
+      <input id="games-search" type="search" autocomplete="off"
+             spellcheck="false" placeholder="Search games"
+             aria-label="Search games">
+      <div class="filters" role="group" aria-label="Show">
+        <button type="button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-filter="waiting"
+                aria-pressed="false">Waiting</button>
+        <button type="button" data-filter="needs"
+                aria-pressed="false">Needs you</button>
+      </div>
+    </div>
+    <div class="columns" aria-hidden="true">
+      <span>Game</span><span>Floppy entry</span><span class="num">Sent</span>
+      <span class="num">Waiting</span><span>Last played</span>
+    </div>
+    <div id="games-list" role="list"></div>
+    <p class="note" id="games-empty" hidden></p>
+    <button type="button" class="more" id="games-more" hidden>Show more</button>
   </section>
   </div>
 
@@ -375,9 +511,10 @@
   var foot = document.getElementById("foot");
   var setupNote = document.getElementById("setup-note");
 
-  /* Tabs. Each has its own address (#now, #settings), so a tab can be
-     bookmarked and the browser's back button works. */
-  var tabs = ["now", "settings"];
+  /* Tabs. Each has its own address (#now, #games, #settings), so a tab can
+     be bookmarked and the browser's back button works. */
+  var tabs = ["now", "games", "settings"];
+  var currentTab = "now";
 
   function tabFromHash() {
     var name = location.hash.replace("#", "");
@@ -385,6 +522,10 @@
   }
 
   function showTab(name) {
+    currentTab = name;
+    if (name === "games") {
+      loadGames();
+    }
     tabs.forEach(function (tab) {
       var on = tab === name;
       document.getElementById("tab-" + tab)
@@ -431,7 +572,8 @@
   }
 
   function showConfig(config) {
-    setupNote.hidden = Boolean(config.floppy_url && config.token_set);
+    configured = Boolean(config.floppy_url && config.token_set);
+    setupNote.hidden = configured;
     urlInput.value = config.floppy_url || "";
     sending = config.send_to_floppy === true;
     sendInput.checked = sending;
@@ -496,11 +638,10 @@
       });
   });
 
-  var nowBox = document.getElementById("now");
-  var nowGame = document.getElementById("now-game");
-  var nowDetail = document.getElementById("now-detail");
-  var waitingList = document.getElementById("waiting");
-  var waitingNote = document.getElementById("waiting-note");
+  /* ---- Formatting and building -------------------------------------- */
+
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
+                "Sep", "Oct", "Nov", "Dec"];
 
   function duration(seconds) {
     var minutes = Math.floor(seconds / 60);
@@ -513,72 +654,305 @@
     return Math.floor(minutes / 60) + " h " + (minutes % 60) + " min";
   }
 
-  function showTracker(tracker) {
-    var playing = tracker.playing;
-    var waiting = tracker.waiting || [];
+  function capital(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function twoDigits(n) {
+    return (n < 10 ? "0" : "") + n;
+  }
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  /* A past moment as "today 09:42", "yesterday 21:10", "3 days ago" or
+     "12 Oct". */
+  function when(epoch) {
+    if (!epoch) {
+      return "";
+    }
+    var then = new Date(epoch * 1000);
+    var now = new Date();
+    var days = Math.round((startOfDay(now) - startOfDay(then)) / 86400000);
+    var time = twoDigits(then.getHours()) + ":" + twoDigits(then.getMinutes());
+    if (days <= 0) {
+      return "today " + time;
+    }
+    if (days === 1) {
+      return "yesterday " + time;
+    }
+    if (days < 7) {
+      return days + " days ago";
+    }
+    return then.getDate() + " " + months[then.getMonth()] +
+      (then.getFullYear() === now.getFullYear() ? "" : " " + then.getFullYear());
+  }
+
+  /* A recent moment as "just now", "10 min ago", or as `when` after that. */
+  function ago(epoch) {
+    var seconds = Date.now() / 1000 - epoch;
+    if (seconds < 60) {
+      return "just now";
+    }
+    if (seconds < 3600) {
+      return Math.floor(seconds / 60) + " min ago";
+    }
+    return when(epoch);
+  }
+
+  /* Everything shown is set as text, never as HTML: game and Floppy titles
+     come from outside. */
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) {
+      node.className = className;
+    }
+    if (text !== undefined) {
+      node.textContent = text;
+    }
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) {
+      node.removeChild(node.firstChild);
+    }
+  }
+
+  function needsText(game) {
+    if (game.note) {
+      return game.note;
+    }
+    return game.sync === "attention" ? "Needs attention." : "Needs a match.";
+  }
+
+  /* ---- Now: what is playing, and what needs the user ------------------ */
+
+  var nowBox = document.getElementById("now");
+  var nowGame = document.getElementById("now-game");
+  var nowDetail = document.getElementById("now-detail");
+  var nowEntry = document.getElementById("now-entry");
+  var needsBox = document.getElementById("needs");
+  var needsTitle = document.getElementById("needs-title");
+  var needsList = document.getElementById("needs-list");
+  var waitingSummary = document.getElementById("waiting-summary");
+  var lastSent = document.getElementById("last-sent");
+  var modeNote = document.getElementById("mode-note");
+  var configured = false;
+
+  function showNow(data) {
+    var playing = data.playing;
+    var counts = data.counts;
 
     if (playing) {
       nowGame.textContent = playing.name;
-      nowDetail.textContent = playing.focused
-        ? "Playing now. " + duration(playing.session_seconds) + " this session."
-        : "Minimized, clock paused. " + duration(playing.session_seconds) +
-          " this session.";
+      nowDetail.textContent = (playing.focused
+        ? "On screen. "
+        : "Minimized, clock paused. ") +
+        capital(duration(playing.session_seconds)) + " this session.";
+      nowEntry.textContent = playing.entry
+        ? "Goes to " + playing.entry + " in Floppy."
+        : "Not matched to a Floppy entry yet. That happens when it closes.";
     } else {
       nowGame.textContent = "No game running";
       nowDetail.textContent = "";
+      nowEntry.textContent = "";
     }
 
-    while (waitingList.firstChild) {
-      waitingList.removeChild(waitingList.firstChild);
-    }
-    waiting.forEach(function (game) {
-      var row = document.createElement("li");
-      var name = document.createElement("span");
-      var time = document.createElement("span");
-      name.textContent = game.name;
-      time.className = "time";
-      time.textContent = duration(game.seconds);
-      row.appendChild(name);
-      row.appendChild(time);
-      var open = playing && playing.title_id === game.title_id;
-      var sync = document.createElement("span");
-      sync.className = "sync";
-      sync.setAttribute("data-state", game.sync);
-      if (game.note) {
-        /* The open game is skipped by sync, so its note is from before this
-           session. */
-        sync.textContent = open
-          ? "Checked before this session, rechecked when the game closes. " +
-            game.note
-          : game.note;
-      } else if (open) {
-        sync.textContent = "Not checked yet: the game is open. It is " +
-          "checked when it closes.";
-      } else if (game.seconds < 60) {
-        sync.textContent = "Under a minute: nothing to send yet.";
-      } else {
-        sync.textContent = "Not checked yet.";
+    clear(needsList);
+    data.games.forEach(function (game) {
+      var item = el("li");
+      item.appendChild(el("strong", "", game.name));
+      if (game.waiting_seconds) {
+        item.appendChild(el("span", "detail",
+          " · " + duration(game.waiting_seconds) + " waiting"));
       }
-      row.appendChild(sync);
-      waitingList.appendChild(row);
+      item.appendChild(el("span", "sync", needsText(game)));
+      needsList.appendChild(item);
     });
-    waitingList.hidden = waiting.length === 0;
-    waitingNote.textContent = !waiting.length
-      ? "Nothing waiting to be sent."
-      : sending
-        ? "Counted on this console. Whole minutes go to Floppy after the " +
-          "game closes."
-        : "Test mode: nothing is sent to Floppy. Under each game is what " +
-          "would be sent. Turn on Send playtime to Floppy in Settings to " +
-          "send it.";
+    needsBox.hidden = counts.needs === 0;
+    needsTitle.textContent = "Needs you (" + counts.needs + ")";
+
+    clear(waitingSummary);
+    if (counts.waiting) {
+      var link = el("a", "", "See Games");
+      link.href = "#games";
+      link.addEventListener("click", function () {
+        setFilter("waiting");
+      });
+      waitingSummary.appendChild(document.createTextNode(counts.waiting +
+        (counts.waiting === 1 ? " game has" : " games have") +
+        " time waiting to be sent. "));
+      waitingSummary.appendChild(link);
+    } else if (!playing && !counts.needs && configured) {
+      waitingSummary.textContent = "Everything is sent.";
+    }
+
+    lastSent.textContent = data.last_sent
+      ? "Last sent " + ago(data.last_sent.at) + ": " + data.last_sent.note
+      : "";
+    modeNote.textContent = configured && !sending
+      ? "Test mode: nothing is sent to Floppy. Turn on Send playtime to " +
+        "Floppy in Settings when the games' notes look right."
+      : "";
     nowBox.hidden = false;
   }
 
-  function pollTracker() {
-    api("GET", "/api/tracker").then(showTracker).catch(function () {});
+  /* ---- Games: every game the tracker has seen ------------------------- */
+
+  var gamesSearch = document.getElementById("games-search");
+  var gamesList = document.getElementById("games-list");
+  var gamesEmpty = document.getElementById("games-empty");
+  var gamesMore = document.getElementById("games-more");
+  var filterButtons = document.querySelectorAll("[data-filter]");
+  var PAGE = 50;
+  var gamesData = null;
+  var gamesFilter = "all";
+  var gamesShown = PAGE;
+  var expanded = {};
+
+  function setFilter(name) {
+    gamesFilter = name;
+    gamesShown = PAGE;
+    Array.prototype.forEach.call(filterButtons, function (button) {
+      button.setAttribute("aria-pressed",
+        button.getAttribute("data-filter") === name ? "true" : "false");
+    });
+    renderGames();
   }
-  pollTracker();
-  setInterval(pollTracker, 5000);
+
+  function isNeeds(game) {
+    return game.sync === "needs_match" || game.sync === "attention";
+  }
+
+  function gameRow(game, playing) {
+    var id = game.title_id;
+    var row = el("div", "row");
+    var head = el("button", "row-head");
+    var detail = el("div", "row-detail");
+    var entry = el("span", "entry", game.entry ||
+      (game.sync === "needs_match" ? "Needs a match"
+       : game.sync === "attention" ? "Needs attention" : "Not matched yet"));
+    var sent = el("span", "sent", game.sent_minutes
+      ? duration(game.sent_minutes * 60) : "");
+    var waiting = el("span", "waiting", game.waiting_seconds
+      ? duration(game.waiting_seconds) : "");
+
+    row.setAttribute("role", "listitem");
+    head.type = "button";
+    head.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
+    entry.setAttribute("data-state", game.sync);
+    if (game.sent_minutes) {
+      sent.appendChild(el("span", "lbl", " sent"));
+    }
+    if (game.waiting_seconds) {
+      waiting.appendChild(el("span", "lbl", " waiting"));
+    }
+    head.appendChild(el("span", "name", game.name));
+    head.appendChild(entry);
+    head.appendChild(sent);
+    head.appendChild(waiting);
+    head.appendChild(el("span", "when",
+      playing ? "playing now" : when(game.last_played)));
+
+    if (game.note) {
+      detail.appendChild(el("p", isNeeds(game) ? "bad-text"
+        : game.sync === "sent" ? "ok-text" : "", game.note));
+    }
+    detail.appendChild(el("p", "detail", "Title ID " + id +
+      (game.last_played ? ". Last played " + when(game.last_played) + "." : ".")));
+    detail.hidden = !expanded[id];
+
+    head.addEventListener("click", function () {
+      expanded[id] = !expanded[id];
+      detail.hidden = !expanded[id];
+      head.setAttribute("aria-expanded", expanded[id] ? "true" : "false");
+    });
+    row.appendChild(head);
+    row.appendChild(detail);
+    return row;
+  }
+
+  function renderGames() {
+    if (!gamesData) {
+      return;
+    }
+    var counts = gamesData.counts;
+    var playingId = gamesData.playing ? gamesData.playing.title_id : "";
+    var query = gamesSearch.value.trim().toLowerCase();
+    var labels = { all: "All " + counts.all, waiting: "Waiting " + counts.waiting,
+                   needs: "Needs you " + counts.needs };
+
+    Array.prototype.forEach.call(filterButtons, function (button) {
+      button.textContent = labels[button.getAttribute("data-filter")];
+    });
+
+    var list = gamesData.games.filter(function (game) {
+      if (gamesFilter === "waiting" && !game.waiting_seconds) {
+        return false;
+      }
+      if (gamesFilter === "needs" && !isNeeds(game)) {
+        return false;
+      }
+      return !query || game.name.toLowerCase().indexOf(query) >= 0 ||
+        game.entry.toLowerCase().indexOf(query) >= 0;
+    });
+    /* The game being played first, then the most recently played. */
+    list.sort(function (a, b) {
+      if ((a.title_id === playingId) !== (b.title_id === playingId)) {
+        return a.title_id === playingId ? -1 : 1;
+      }
+      if (a.last_played !== b.last_played) {
+        return b.last_played - a.last_played;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    clear(gamesList);
+    list.slice(0, gamesShown).forEach(function (game) {
+      gamesList.appendChild(gameRow(game, game.title_id === playingId));
+    });
+    gamesMore.hidden = list.length <= gamesShown;
+    gamesEmpty.hidden = list.length > 0;
+    gamesEmpty.textContent = query
+      ? "No game matches “" + gamesSearch.value.trim() + "”."
+      : gamesFilter === "waiting" ? "Nothing waiting to be sent."
+      : gamesFilter === "needs" ? "Nothing needs you."
+      : "No games yet. Play one for two minutes and it appears here.";
+  }
+
+  function loadGames() {
+    return api("GET", "/api/games").then(function (data) {
+      gamesData = data;
+      renderGames();
+    }).catch(function () {});
+  }
+
+  gamesSearch.addEventListener("input", function () {
+    gamesShown = PAGE;
+    renderGames();
+  });
+  Array.prototype.forEach.call(filterButtons, function (button) {
+    button.addEventListener("click", function () {
+      setFilter(button.getAttribute("data-filter"));
+    });
+  });
+  gamesMore.addEventListener("click", function () {
+    gamesShown += PAGE;
+    renderGames();
+  });
+
+  /* Now is polled all the time, so its card stays current whichever tab is
+     open. The full game list only while Games is open. */
+  function poll() {
+    api("GET", "/api/tracker").then(showNow).catch(function () {});
+    if (currentTab === "games") {
+      loadGames();
+    }
+  }
+  poll();
+  setInterval(poll, 5000);
 
   api("GET", "/api/status")
     .then(function (status) {

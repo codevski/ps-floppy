@@ -68,6 +68,10 @@ set_state(struct app *app, const struct job *job, enum sync_state state,
     g->sync = state;
     snprintf(g->sync_note, sizeof g->sync_note, "%s", note);
   }
+  if(state == SYNC_SENT) {
+    snprintf(app->last_sent, sizeof app->last_sent, "%s", note);
+    app->last_sent_at = time(NULL);
+  }
   pthread_mutex_unlock(&app->lock);
 }
 
