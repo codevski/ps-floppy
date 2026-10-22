@@ -194,6 +194,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(400, {"detail": "Invalid time format"})
             # Like Floppy: no check for an existing entry.
             new = entry(media_id, minutes, body.get("status", "Planning"))
+            new["start_date"] = body.get("start_date")
             state["entries"].append(new)
             return self.misbehave(201, new)
 

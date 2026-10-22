@@ -9,6 +9,7 @@
 #include "match.h"
 
 #include <stddef.h>
+#include <time.h>
 
 /* Results asked for per library search. An entry is about 3 KB and the
  * reply buffer is 64 KB. */
@@ -52,8 +53,9 @@ enum match_result floppy_find_on_igdb(const struct config *cfg,
 int floppy_update(const struct config *cfg, const char *igdb_id, long total,
                   char *why, size_t why_size);
 
-/* Track `igdb_id` as a new game, In progress, with `minutes` played. Floppy
- * does not check for an existing entry, so call this only after the library
- * has been searched by both names and holds nothing that could be it. */
+/* Track `igdb_id` as a new game, In progress, with `minutes` played and,
+ * when `started` is not 0, that start date. Floppy does not check for an
+ * existing entry, so call this only after the library has been searched by
+ * both names and holds nothing that could be it. */
 int floppy_track(const struct config *cfg, const char *igdb_id, long minutes,
-                 char *why, size_t why_size);
+                 time_t started, char *why, size_t why_size);

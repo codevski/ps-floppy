@@ -21,6 +21,7 @@ struct job {
   long intent_from;
   long intent_to;
   long last_total;
+  time_t first_played;
 };
 
 static double
@@ -148,6 +149,7 @@ apply_landed(struct app *app, const struct job *job, long from, long to) {
       g->pending = 0;
     }
     g->last_total = to;
+    g->sent_total += to - from;
     g->intent[0] = 0;
     g->intent_from = g->intent_to = 0;
     app->store.dirty = 1;
@@ -183,14 +185,22 @@ send_and_record(struct app *app, const struct config *cfg,
   char note[NOTE_MAX], why[400];
   int ok;
 
-  ok = track ? floppy_track(cfg, igdb_id, to, why, sizeof why)
+  ok = track ? floppy_track(cfg, igdb_id, to, job->first_played, why,
+                            sizeof why)
              : floppy_update(cfg, igdb_id, to, why, sizeof why);
   if(ok) {
     apply_landed(app, job, from, to);
     set_last_sent(app, to - from, title);
     if(track) {
+      char started[64] = " No start date: first played before the tracker "
+                         "recorded it.";
+      struct tm tm;
+
+      if(job->first_played && localtime_r(&job->first_played, &tm)) {
+        strftime(started, sizeof started, " Start date %d %b %Y.", &tm);
+      }
       snprintf(note, sizeof note, "Added %s (IGDB %s) to your library with "
-               "%ld min.%s", title, igdb_id, to, extra);
+               "%ld min.%s%s", title, igdb_id, to, started, extra);
     } else {
       snprintf(note, sizeof note, "Sent %ld min to %s: %ld to %ld min.%s",
                to - from, title, from, to, extra);
@@ -430,6 +440,7 @@ sync_pass(struct app *app) {
     j->intent_from = g->intent_from;
     j->intent_to = g->intent_to;
     j->last_total = g->last_total;
+    j->first_played = g->first_played;
     count++;
   }
   pthread_mutex_unlock(&app->lock);

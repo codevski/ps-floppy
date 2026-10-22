@@ -46,20 +46,27 @@ total_of(const struct config *cfg, const char *id, const char *title,
   return r;
 }
 
-/* The status Floppy holds for a game, read straight from a library search. */
+/* A text field Floppy holds for a game, read straight from a library
+ * search. */
 static int
-status_is(const struct config *cfg, const char *search, const char *want) {
+field_is(const struct config *cfg, const char *search, const char *field,
+         const char *want) {
   static char buf[64 * 1024];
   struct http_reply reply;
-  char path[256], status[32];
+  char path[256], value[64];
 
   snprintf(path, sizeof path, "/api/v1/media/game?search=%s&limit=10", search);
   return !http_request(cfg, "GET", path, 1, NULL, buf, sizeof buf, &reply) &&
          !json_valid(reply.body) &&
          !json_string(json_member(json_first(json_member(reply.body,
                                                          "results")),
-                                  "status"), status, sizeof status) &&
-         !strcmp(status, want);
+                                  field), value, sizeof value) &&
+         !strcmp(value, want);
+}
+
+static int
+status_is(const struct config *cfg, const char *search, const char *want) {
+  return field_is(cfg, search, "status", want);
 }
 
 static void
@@ -106,20 +113,26 @@ test_writes(const struct config *cfg) {
   CHECK(floppy_update(cfg, "347180", 0, why, sizeof why) == 0);
 
   /* Track: minutes arrive as minutes, not hours. */
-  CHECK(floppy_track(cfg, "555", 10, why, sizeof why) == 1);
+  CHECK(floppy_track(cfg, "555", 10, 1792540800, why, sizeof why) == 1);
   CHECK(total_of(cfg, "555", "Fresh Game", &t) == MATCH_FOUND && t == 10);
   CHECK(status_is(cfg, "Fresh%20Game", "In progress"));
+  /* The start date arrives in UTC with its offset: 1792540800 is
+   * 2026-10-21 00:00:00 UTC. */
+  CHECK(field_is(cfg, "Fresh%20Game", "start_date",
+                 "2026-10-21T00:00:00+00:00"));
 
   /* Track applied, then dropped. Reading shows it is there: not sent
    * again. */
   mock(cfg, "/mock/mode", "{\"mode\":\"drop\"}");
-  CHECK(floppy_track(cfg, "556", 25, why, sizeof why) == 0);
+  CHECK(floppy_track(cfg, "556", 25, 0, why, sizeof why) == 0);
   r = total_of(cfg, "556", "Second Game", &t);
   CHECK(settle_track(r, t, 25) == SETTLE_LANDED);
+  /* Tracked with no known first session: no start date is sent at all. */
+  CHECK(!field_is(cfg, "Second%20Game", "start_date", ""));
 
   /* Why that matters: sending it blindly makes a second entry, which the
    * mock allows just like Floppy. Settling then asks for the user. */
-  CHECK(floppy_track(cfg, "556", 25, why, sizeof why) == 1);
+  CHECK(floppy_track(cfg, "556", 25, 0, why, sizeof why) == 1);
   r = total_of(cfg, "556", "Second Game", &t);
   CHECK(r == MATCH_AMBIGUOUS);
   CHECK(settle_track(r, t, 25) == SETTLE_ATTENTION);

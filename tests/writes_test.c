@@ -91,12 +91,15 @@ test_store(void) {
   g->intent_to = 95;
   g->last_total = 40;
   g->last_played = 1791000000;
+  g->sent_total = 121;
+  g->first_played = 1790990000;
   CHECK(!store_save(&st, path, 1));
   CHECK(!store_load(&st, path));
   g = &st.games[0];
   CHECK(!strcmp(g->intent, "update"));
   CHECK(g->intent_from == 0 && g->intent_to == 95 && g->last_total == 40);
   CHECK(g->last_played == 1791000000);
+  CHECK(g->sent_total == 121 && g->first_played == 1790990000);
   CHECK(!strcmp(g->igdb_title, "Silent Hill f: Deluxe Edition"));
 
   /* Cleared again, saved without fsync. */
@@ -113,6 +116,7 @@ test_store(void) {
   fclose(f);
   CHECK(!store_load(&st, path) && st.count == 1);
   CHECK(st.games[0].last_total == 121 && st.games[0].last_played == 0);
+  CHECK(st.games[0].sent_total == 0 && st.games[0].first_played == 0);
 
   /* A damaged intent is dropped rather than acted on. */
   f = fopen(path, "w");

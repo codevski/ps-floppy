@@ -327,11 +327,14 @@ handle_get_games(struct app *app, int fd, int all) {
     }
     used += (size_t)snprintf(out + used, size - used,
                              "%s{\"title_id\":\"%s\",\"name\":\"%s\","
-                             "\"waiting_seconds\":%ld,\"sent_minutes\":%ld,"
+                             "\"waiting_seconds\":%ld,"
+                             "\"in_floppy_minutes\":%ld,"
+                             "\"from_ps5_minutes\":%ld,"
                              "\"entry\":\"%s\",\"last_played\":%lld,"
                              "\"sync\":\"%s\",\"note\":\"%s\"}",
                              first ? "" : ",", g->title_id, name,
                              is_waiting(g) ? g->pending : 0, g->last_total,
+                             g->sent_total,
                              entry, (long long)g->last_played,
                              states[g->sync], note);
     first = 0;

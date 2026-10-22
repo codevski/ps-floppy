@@ -43,6 +43,7 @@ struct now_playing {
   char name[128];
   int  focused;        /* 0 while the game is minimized */
   long session;        /* seconds counted this session */
+  time_t started_at;   /* wall clock when the tracker first saw it */
 };
 
 struct app {

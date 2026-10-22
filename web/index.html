@@ -21,7 +21,6 @@
     --warn: #b4610b;
     --bad: #c23b2e;
     --bad-soft: #fcebea;
-    --bar: #c9d2f6;
     --off: #8a929e;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
       Arial, sans-serif;
@@ -41,7 +40,6 @@
       --warn: #e6a246;
       --bad: #f07a6e;
       --bad-soft: #3a1f1d;
-      --bar: #34407a;
       --off: #6b7280;
       color-scheme: dark;
     }
@@ -290,8 +288,11 @@
   .c-entry.bad { color: var(--bad); font-weight: 600; }
   .c-when { grid-row: 1; grid-column: 2; color: var(--muted); font-size: 0.8rem; text-align: right; white-space: nowrap; }
   .c-when.playing { color: var(--ok); font-weight: 600; }
-  .c-sent { grid-column: 2; font-size: 0.82rem; text-align: right; white-space: nowrap; }
-  .c-sent .bar { display: none; }
+  .c-ps5,
+  .c-floppy { grid-column: 2; font-size: 0.82rem; text-align: right; white-space: nowrap; }
+  .c-floppy { color: var(--muted); }
+  .c-ps5:empty,
+  .c-floppy:empty { display: none; }
   .c-wait { grid-column: 1 / -1; color: var(--warn); font-size: 0.8rem; }
   .c-wait:empty { display: none; }
   .lbl { color: var(--muted); }
@@ -377,7 +378,7 @@
     .now-grid.two { grid-template-columns: 1.15fr 1fr; }
     .cells,
     .head {
-      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.5fr) 200px 80px 120px;
+      grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.5fr) 105px 105px 80px 120px;
       gap: 0 16px;
     }
     .head {
@@ -394,28 +395,15 @@
     .head .r { text-align: right; }
     .cells .c-name,
     .cells .c-entry,
-    .cells .c-sent,
+    .cells .c-ps5,
+    .cells .c-floppy,
     .cells .c-wait,
     .cells .c-when { grid-row: auto; grid-column: auto; }
     .c-when { text-align: left; }
-    /* The bar, then the amount in a fixed width so every bar starts and
-       ends at the same place. */
-    .c-sent {
-      display: grid;
-      grid-template-columns: 1fr 5.6rem;
-      align-items: center;
-      gap: 8px;
-    }
-    .c-sent .bar {
-      display: block;
-      height: 6px;
-      border-radius: 3px;
-      background: var(--line);
-      overflow: hidden;
-    }
-    .c-sent .bar i { display: block; height: 100%; background: var(--bar); }
-    .c-sent .bar.none { visibility: hidden; }
+    .c-floppy { color: var(--fg); }
     .c-wait { text-align: right; }
+    .c-ps5:empty,
+    .c-floppy:empty,
     .c-wait:empty { display: block; }
     .lbl { display: none; }
   }
@@ -508,8 +496,9 @@
         </div>
         <section class="card table">
           <div class="head" aria-hidden="true">
-            <span>Game</span><span>Floppy entry</span><span class="r">Sent</span>
-            <span class="r">Waiting</span><span>Last played</span>
+            <span>Game</span><span>Floppy entry</span><span class="r">From PS5</span>
+            <span class="r">In Floppy</span><span class="r">Waiting</span>
+            <span>Last played</span>
           </div>
           <div id="games-list" role="list"></div>
           <p class="empty" id="games-empty" hidden></p>
@@ -834,7 +823,7 @@
     renderGames();
   }
 
-  function gameRow(game, playing, maxSent) {
+  function gameRow(game, playing) {
     var id = game.title_id;
     var row = el("div", "row");
     var cells = el("button", "cells");
@@ -842,11 +831,8 @@
     var entry = el("span", "c-entry", game.entry ||
       (game.sync === "needs_match" ? "Needs a match"
        : game.sync === "attention" ? "Needs attention" : "Not matched yet"));
-    var sent = el("span", "c-sent num");
-    var bar = el("span", game.sent_minutes ? "bar" : "bar none");
-    var fill = el("i");
-    var amount = el("span", "", game.sent_minutes
-      ? duration(game.sent_minutes * 60) : "");
+    var ps5 = el("span", "c-ps5 num");
+    var floppy = el("span", "c-floppy num");
     var waiting = el("span", "c-wait num");
 
     row.setAttribute("role", "listitem");
@@ -855,14 +841,16 @@
     if (isNeeds(game) && !game.entry) {
       entry.className = "c-entry bad";
     }
-    fill.style.width = game.sent_minutes
-      ? Math.max(4, Math.round(game.sent_minutes / maxSent * 100)) + "%" : "0";
-    bar.appendChild(fill);
-    if (game.sent_minutes) {
-      amount.appendChild(el("span", "lbl", " sent"));
+    /* On a phone each number carries its own label; on a wide screen the
+       column headings say it. */
+    if (game.from_ps5_minutes) {
+      ps5.textContent = duration(game.from_ps5_minutes * 60);
+      ps5.appendChild(el("span", "lbl", " from PS5"));
     }
-    sent.appendChild(bar);
-    sent.appendChild(amount);
+    if (game.in_floppy_minutes) {
+      floppy.textContent = duration(game.in_floppy_minutes * 60);
+      floppy.appendChild(el("span", "lbl", " in Floppy"));
+    }
     if (game.waiting_seconds) {
       waiting.textContent = duration(game.waiting_seconds);
       waiting.appendChild(el("span", "lbl", " waiting"));
@@ -870,7 +858,8 @@
 
     cells.appendChild(el("span", "c-name", game.name));
     cells.appendChild(entry);
-    cells.appendChild(sent);
+    cells.appendChild(ps5);
+    cells.appendChild(floppy);
     cells.appendChild(waiting);
     cells.appendChild(el("span", playing ? "c-when playing" : "c-when",
       playing ? "playing now" : when(game.last_played)));
@@ -902,13 +891,9 @@
     var query = gamesSearch.value.trim().toLowerCase();
     var labels = { all: "All " + counts.all, waiting: "Waiting " + counts.waiting,
                    needs: "Needs you " + counts.needs };
-    var maxSent = 1;
 
     Array.prototype.forEach.call(filterButtons, function (button) {
       button.textContent = labels[button.getAttribute("data-filter")];
-    });
-    gamesData.games.forEach(function (game) {
-      maxSent = Math.max(maxSent, game.sent_minutes);
     });
 
     var list = gamesData.games.filter(function (game) {
@@ -934,7 +919,7 @@
 
     clear(gamesList);
     list.slice(0, gamesShown).forEach(function (game) {
-      gamesList.appendChild(gameRow(game, game.title_id === playingId, maxSent));
+      gamesList.appendChild(gameRow(game, game.title_id === playingId));
     });
     gamesMore.hidden = list.length <= gamesShown;
     gamesEmpty.hidden = list.length > 0;

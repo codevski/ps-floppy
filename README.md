@@ -35,7 +35,7 @@ Until you tick **Send playtime to Floppy** on the config page, the tracker only 
 Once it is on, after a game closes:
 
 - If the game is in your library, in any edition, its whole minutes are added to that entry. Status, dates and notes are left alone. A game you also own on another platform counts together, if it is the same IGDB game.
-- If it is not, and nothing in your library looks like it, the game is added as In progress with its minutes.
+- If it is not, and nothing in your library looks like it, the game is added as In progress with its minutes, and its start date set to when you first played it. Finish dates are left to you.
 - If it is unclear (two possible entries, or a similar name), nothing is sent and the game shows "needs a match". The time stays on the console.
 
 Each write is saved on the console before it is sent and checked against Floppy afterwards, so a crash or a dropped connection cannot add the same minutes twice.
