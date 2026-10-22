@@ -68,6 +68,10 @@ store_load(struct store *st, const char *path) {
     g->intent_from = strtol(next_field(&rest), NULL, 10);
     g->intent_to = strtol(next_field(&rest), NULL, 10);
     g->last_total = strtol(next_field(&rest), NULL, 10);
+    /* Added in 0.1.5. */
+    g->last_played = (time_t)strtoll(next_field(&rest), NULL, 10);
+    g->sent_total = strtol(next_field(&rest), NULL, 10);
+    g->first_played = (time_t)strtoll(next_field(&rest), NULL, 10);
     if(strcmp(g->intent, "update") && strcmp(g->intent, "track")) {
       g->intent[0] = 0;
     }
@@ -77,6 +81,15 @@ store_load(struct store *st, const char *path) {
     }
     if(g->last_total < 0) {
       g->last_total = 0;
+    }
+    if(g->last_played < 0) {
+      g->last_played = 0;
+    }
+    if(g->sent_total < 0) {
+      g->sent_total = 0;
+    }
+    if(g->first_played < 0) {
+      g->first_played = 0;
     }
     st->count++;
   }
@@ -105,6 +118,18 @@ store_save(struct store *st, const char *path, int durable) {
     }
     if(g->last_total > 0) {
       fprintf(f, "%ld", g->last_total);
+    }
+    fputc('\t', f);
+    if(g->last_played > 0) {
+      fprintf(f, "%lld", (long long)g->last_played);
+    }
+    fputc('\t', f);
+    if(g->sent_total > 0) {
+      fprintf(f, "%ld", g->sent_total);
+    }
+    fputc('\t', f);
+    if(g->first_played > 0) {
+      fprintf(f, "%lld", (long long)g->first_played);
     }
     fputc('\n', f);
   }

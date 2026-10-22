@@ -21,6 +21,7 @@ struct job {
   long intent_from;
   long intent_to;
   long last_total;
+  time_t first_played;
 };
 
 static double
@@ -68,6 +69,20 @@ set_state(struct app *app, const struct job *job, enum sync_state state,
     g->sync = state;
     snprintf(g->sync_note, sizeof g->sync_note, "%s", note);
   }
+  if(state == SYNC_SENT) {
+    snprintf(app->last_sent, sizeof app->last_sent, "%s", note);
+  }
+  pthread_mutex_unlock(&app->lock);
+}
+
+/* What the page shows as the last send. Called with the confirmed minutes
+ * and the Floppy entry they went to. */
+static void
+set_last_sent(struct app *app, long minutes, const char *title) {
+  pthread_mutex_lock(&app->lock);
+  copy_tsv(app->last_sent_title, sizeof app->last_sent_title, title);
+  app->last_sent_minutes = minutes;
+  app->last_sent_at = time(NULL);
   pthread_mutex_unlock(&app->lock);
 }
 
@@ -134,6 +149,7 @@ apply_landed(struct app *app, const struct job *job, long from, long to) {
       g->pending = 0;
     }
     g->last_total = to;
+    g->sent_total += to - from;
     g->intent[0] = 0;
     g->intent_from = g->intent_to = 0;
     app->store.dirty = 1;
@@ -169,13 +185,22 @@ send_and_record(struct app *app, const struct config *cfg,
   char note[NOTE_MAX], why[400];
   int ok;
 
-  ok = track ? floppy_track(cfg, igdb_id, to, why, sizeof why)
+  ok = track ? floppy_track(cfg, igdb_id, to, job->first_played, why,
+                            sizeof why)
              : floppy_update(cfg, igdb_id, to, why, sizeof why);
   if(ok) {
     apply_landed(app, job, from, to);
+    set_last_sent(app, to - from, title);
     if(track) {
+      char started[64] = " No start date: first played before the tracker "
+                         "recorded it.";
+      struct tm tm;
+
+      if(job->first_played && localtime_r(&job->first_played, &tm)) {
+        strftime(started, sizeof started, " Start date %d %b %Y.", &tm);
+      }
       snprintf(note, sizeof note, "Added %s (IGDB %s) to your library with "
-               "%ld min.%s", title, igdb_id, to, extra);
+               "%ld min.%s%s", title, igdb_id, to, started, extra);
     } else {
       snprintf(note, sizeof note, "Sent %ld min to %s: %ld to %ld min.%s",
                to - from, title, from, to, extra);
@@ -204,6 +229,7 @@ settle(struct app *app, const struct config *cfg, const struct job *job) {
                                job->intent_to)) {
   case SETTLE_LANDED:
     apply_landed(app, job, job->intent_from, job->intent_to);
+    set_last_sent(app, job->intent_to - job->intent_from, job->igdb_title);
     snprintf(note, sizeof note, "Sent %ld min to %s: %ld to %ld min, "
              "confirmed by reading it back.",
              job->intent_to - job->intent_from, job->igdb_title,
@@ -414,6 +440,7 @@ sync_pass(struct app *app) {
     j->intent_from = g->intent_from;
     j->intent_to = g->intent_to;
     j->last_total = g->last_total;
+    j->first_played = g->first_played;
     count++;
   }
   pthread_mutex_unlock(&app->lock);

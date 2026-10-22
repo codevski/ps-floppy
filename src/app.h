@@ -43,6 +43,7 @@ struct now_playing {
   char name[128];
   int  focused;        /* 0 while the game is minimized */
   long session;        /* seconds counted this session */
+  time_t started_at;   /* wall clock when the tracker first saw it */
 };
 
 struct app {
@@ -57,6 +58,11 @@ struct app {
   int                sync_wanted; /* set when a session ends */
   int                polled;      /* the tracker has looked at least once, so
                                      `now` can be trusted */
+  /* The last confirmed write, for the page. */
+  char               last_sent[512];       /* its note */
+  char               last_sent_title[128]; /* the Floppy entry */
+  long               last_sent_minutes;
+  time_t             last_sent_at;
 };
 
 /* Append a timestamped line to the tracker's log file. */

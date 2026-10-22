@@ -260,8 +260,9 @@ floppy_update(const struct config *cfg, const char *igdb_id, long total,
 
 int
 floppy_track(const struct config *cfg, const char *igdb_id, long minutes,
-             char *why, size_t why_size) {
-  char body[160];
+             time_t started, char *why, size_t why_size) {
+  char body[256], start[64] = "";
+  struct tm tm;
   const char *reply;
   char *buf;
   int status, ok;
@@ -273,10 +274,16 @@ floppy_track(const struct config *cfg, const char *igdb_id, long minutes,
   /* This route reads `progress` through Floppy's duration field, where a
    * bare number means hours: "95" would be 95 hours. "95 minutes" is 95
    * minutes. PATCH, above, takes plain minutes. */
+  /* The start date in UTC with an explicit offset, so Floppy stores the
+   * right moment whatever its own time zone. */
+  if(started > 0 && gmtime_r(&started, &tm)) {
+    strftime(start, sizeof start,
+             ",\"start_date\":\"%Y-%m-%dT%H:%M:%S+00:00\"", &tm);
+  }
   snprintf(body, sizeof body,
            "{\"source\":\"igdb\",\"media_id\":\"%s\","
-           "\"status\":\"In progress\",\"progress\":\"%ld minutes\"}",
-           igdb_id, minutes);
+           "\"status\":\"In progress\",\"progress\":\"%ld minutes\"%s}",
+           igdb_id, minutes, start);
 
   reply = send_write(cfg, "POST", "/api/v1/media/game", body, &status, &buf,
                      why, why_size);

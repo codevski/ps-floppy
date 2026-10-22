@@ -238,60 +238,111 @@ handle_get_status(struct app *app, int fd) {
   respond_json(fd, 200, out);
 }
 
-/* What the tracker sees and what it is holding, for the page. */
-static void
-handle_get_tracker(struct app *app, int fd) {
-  size_t size = 64 * 1024;
-  char *out = malloc(size);
-  char name[400];
-  char note[1100];
-  size_t used = 0;
-  int first = 1;
+/* A game counts as waiting only with a whole minute to send. Leftover
+ * seconds under a minute stay on the console but are not shown as waiting. */
+static int
+is_waiting(const struct game *g) {
+  return g->pending >= 60;
+}
 
-  if(!out) {
+/* The game needs the user: no match, or a write that conflicts. */
+static int
+needs_user(const struct game *g) {
+  return g->sync == SYNC_NEEDS_MATCH || g->sync == SYNC_ATTENTION;
+}
+
+/* What the tracker sees and holds, for the page. The Now tab polls it with
+ * `all` off, which lists only the games that need the user. The Games tab
+ * asks for every game. */
+static void
+handle_get_games(struct app *app, int fd, int all) {
+  static const char *const states[] = {
+    [SYNC_NOT_YET] = "not_yet", [SYNC_READY] = "ready",
+    [SYNC_NEEDS_MATCH] = "needs_match", [SYNC_RETRY] = "retry",
+    [SYNC_SENT] = "sent", [SYNC_ATTENTION] = "attention",
+  };
+  char name[400], entry[400], note[1100];
+  int waiting = 0, needs = 0, first = 1;
+  long waiting_seconds = 0;
+  size_t size, used = 0;
+  char *out;
+
+  pthread_mutex_lock(&app->lock);
+
+  /* Room for the fixed part, then the most one game can take. */
+  size = 4096 + (size_t)app->store.count * 2400;
+  if(!(out = malloc(size))) {
+    pthread_mutex_unlock(&app->lock);
     respond_error(fd, 500, "Out of memory.");
     return;
   }
 
-  pthread_mutex_lock(&app->lock);
-
   if(app->now.title_id[0]) {
+    const struct game *g = NULL;
+
+    for(int i = 0; i < app->store.count; i++) {
+      if(!strcmp(app->store.games[i].title_id, app->now.title_id)) {
+        g = &app->store.games[i];
+      }
+    }
     json_escape(app->now.name, name, sizeof name);
+    json_escape(g ? g->igdb_title : "", entry, sizeof entry);
     used += (size_t)snprintf(out + used, size - used,
-                             "{\"playing\":{\"title_id\":\"%s\",\"name\":\"%s\","
-                             "\"focused\":%s,\"session_seconds\":%ld},",
+                             "{\"playing\":{\"title_id\":\"%s\","
+                             "\"name\":\"%s\",\"focused\":%s,"
+                             "\"session_seconds\":%ld,\"entry\":\"%s\"},",
                              app->now.title_id, name,
                              app->now.focused ? "true" : "false",
-                             app->now.session);
+                             app->now.session, entry);
   } else {
     used += (size_t)snprintf(out + used, size - used, "{\"playing\":null,");
   }
 
-  used += (size_t)snprintf(out + used, size - used, "\"waiting\":[");
-  for(int i = 0; i < app->store.count && used + 2000 < size; i++) {
-    static const char *const states[] = {
-      [SYNC_NOT_YET] = "not_yet", [SYNC_READY] = "ready",
-      [SYNC_NEEDS_MATCH] = "needs_match", [SYNC_RETRY] = "retry",
-      [SYNC_SENT] = "sent", [SYNC_ATTENTION] = "attention",
-    };
+  if(app->last_sent_at) {
+    json_escape(app->last_sent, note, sizeof note);
+    json_escape(app->last_sent_title, entry, sizeof entry);
+    used += (size_t)snprintf(out + used, size - used,
+                             "\"last_sent\":{\"note\":\"%s\",\"entry\":\"%s\","
+                             "\"minutes\":%ld,\"at\":%lld},",
+                             note, entry, app->last_sent_minutes,
+                             (long long)app->last_sent_at);
+  } else {
+    used += (size_t)snprintf(out + used, size - used, "\"last_sent\":null,");
+  }
+
+  used += (size_t)snprintf(out + used, size - used, "\"games\":[");
+  for(int i = 0; i < app->store.count; i++) {
     const struct game *g = &app->store.games[i];
 
-    if(g->pending <= 0) {
+    waiting += is_waiting(g);
+    waiting_seconds += is_waiting(g) ? g->pending : 0;
+    needs += needs_user(g);
+    if(!all && !needs_user(g)) {
       continue;
     }
     json_escape(g->name, name, sizeof name);
+    json_escape(g->igdb_title, entry, sizeof entry);
     if(json_escape(g->sync_note, note, sizeof note)) {
       note[0] = 0;
     }
     used += (size_t)snprintf(out + used, size - used,
                              "%s{\"title_id\":\"%s\",\"name\":\"%s\","
-                             "\"seconds\":%ld,\"sync\":\"%s\","
-                             "\"note\":\"%s\"}",
-                             first ? "" : ",", g->title_id, name, g->pending,
+                             "\"waiting_seconds\":%ld,"
+                             "\"in_floppy_minutes\":%ld,"
+                             "\"from_ps5_minutes\":%ld,"
+                             "\"entry\":\"%s\",\"last_played\":%lld,"
+                             "\"sync\":\"%s\",\"note\":\"%s\"}",
+                             first ? "" : ",", g->title_id, name,
+                             is_waiting(g) ? g->pending : 0, g->last_total,
+                             g->sent_total,
+                             entry, (long long)g->last_played,
                              states[g->sync], note);
     first = 0;
   }
-  snprintf(out + used, size - used, "]}");
+  snprintf(out + used, size - used,
+           "],\"counts\":{\"all\":%d,\"waiting\":%d,\"needs\":%d,"
+           "\"waiting_seconds\":%ld}}",
+           app->store.count, waiting, needs, waiting_seconds);
 
   pthread_mutex_unlock(&app->lock);
 
@@ -509,7 +560,9 @@ handle_client(struct app *app, int fd) {
   } else if(!strcmp(req.path, "/api/status") && is_get) {
     handle_get_status(app, fd);
   } else if(!strcmp(req.path, "/api/tracker") && is_get) {
-    handle_get_tracker(app, fd);
+    handle_get_games(app, fd, 0);
+  } else if(!strcmp(req.path, "/api/games") && is_get) {
+    handle_get_games(app, fd, 1);
   } else if(!strcmp(req.path, "/api/config") && is_get) {
     handle_get_config(app, fd);
   } else if(!strcmp(req.path, "/api/config") && is_post) {

@@ -40,6 +40,13 @@ end_session(struct app *app) {
   } else {
     app_log(app, "closed %s \"%s\": session %lds, %lds waiting to send",
             now->title_id, now->name, now->session, g ? g->pending : 0);
+    if(g) {
+      g->last_played = time(NULL);
+      if(!g->first_played) {
+        g->first_played = now->started_at;
+      }
+      app->store.dirty = 1;
+    }
     app->sync_wanted = 1;
   }
   memset(now, 0, sizeof *now);
@@ -105,6 +112,7 @@ tracker_run(struct app *app) {
         memcpy(app->now.title_id, title_id, sizeof app->now.title_id);
         snprintf(app->now.name, sizeof app->now.name, "%s", name);
         app->now.session = 0;
+        app->now.started_at = time(NULL);
         app_log(app, "started %s \"%s\"%s", title_id, name,
                 focused ? "" : " (minimized)");
       }
